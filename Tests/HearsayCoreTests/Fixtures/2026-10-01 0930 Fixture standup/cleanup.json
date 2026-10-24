@@ -1,0 +1,9 @@
+{
+  "sourceProcessedAt": "2026-10-01T16:32:00.123Z",
+  "method": "fillers",
+  "utterances": [
+    { "index": 0, "text": "So the build is green." },
+    { "index": 1, "text": "Great, ship it today." }
+  ],
+  "extra": "ignored"
+}

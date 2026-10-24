@@ -1,0 +1,8 @@
+{
+  "updatedAt": "2026-10-01T16:31:04.000Z",
+  "speakerNames": { "mic-1": "Tanner" },
+  "lines": [
+    { "speaker": "mic-1", "stream": "mic", "start": 2.0, "end": 6.4, "text": "so so the build is green" },
+    { "speaker": "sys-1", "start": 7.1, "end": 36.9, "text": "great ship it today", "slot": 0 }
+  ]
+}

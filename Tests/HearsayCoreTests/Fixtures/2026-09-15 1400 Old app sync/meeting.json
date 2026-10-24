@@ -1,0 +1,17 @@
+{
+  "id": "2026-09-15 1400 Old app sync",
+  "title": "Old app sync",
+  "startedAt": "2026-09-15T21:00:04Z",
+  "endedAt": 1757970124.5,
+  "status": "done",
+  "error": null,
+  "engine": "whisper",
+  "echoCancellation": true,
+  "appVersion": "1.4.2",
+  "streams": [
+    { "kind": "mic", "file": "audio/mic.m4a", "startOffset": 0, "sampleRate": 48000, "channels": 1 },
+    { "kind": "system", "file": "audio/system.m4a", "startOffset": 0.84, "sampleRate": 48000, "channels": 2 }
+  ],
+  "speakerNames": { "sys-1": "Tanner", "sys-2": "Nate" },
+  "attendees": ["Tanner Vass", "Nate Example"]
+}

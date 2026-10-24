@@ -1,0 +1,15 @@
+{
+  "formatVersion": 1,
+  "engine": "whisper",
+  "processedAt": "2026-09-15T21:05:00Z",
+  "speakers": [
+    { "id": "sys-1", "defaultLabel": "Remote 1", "talkSeconds": 12.5 },
+    { "id": "sys-2", "defaultLabel": "Remote 2", "talkSeconds": 8 }
+  ],
+  "utterances": [
+    { "speaker": "sys-1", "start": 1.0, "end": 6.5, "text": "Thanks for hopping on, Nate.",
+      "words": [ { "word": "Thanks", "start": 1.0, "end": 1.4 }, { "word": "for", "start": 1.4, "end": 1.6 } ] },
+    { "speaker": "sys-2", "start": 7.0, "end": 15.0, "text": "Sure. Um, the the release is ready." },
+    { "speaker": "sys-1", "start": 15.5, "end": 22.5, "text": "Great, let's ship it." }
+  ]
+}
