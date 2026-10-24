@@ -109,7 +109,8 @@ public enum ProcessPipeline {
         do {
             let tracks = try Track.load(meeting, store: store)
             guard !tracks.isEmpty else { throw NothingUsable.noAudio }
-            var transcript = try await transcribe(meeting.id, tracks: tracks, engines: options.engines)
+            let heard = heardStreams((try? store.loadLive(id)) ?? nil)
+            var transcript = try await transcribe(meeting.id, tracks: tracks, engines: options.engines, heard: heard)
             guard !transcript.utterances.isEmpty else { throw NothingUsable.noSpeech }
             transcript = Glossary.load(root: store.root).apply(to: transcript)
             try await SpeakerIdentity.embed(&transcript, tracks: tracks, embedder: options.engines.embedder)
@@ -150,13 +151,20 @@ public enum ProcessPipeline {
     }
 
     /// Steps 1 to 3: gate, transcribe, echo filter, diarize and attribute, per track.
-    static func transcribe(_ id: String, tracks: [Track], engines: PipelineEngines) async throws -> Transcript {
+    /// Streams the live transcript heard words on. The live model already found speech there, so the
+    /// loudness gate must not discard it: a quiet 0.1.0 test clip had 2.93 of the 3 loud seconds it
+    /// needed and the meeting failed with "no speech" under a live transcript full of words.
+    static func heardStreams(_ live: LiveTranscript?) -> Set<StreamKind> {
+        Set((live?.lines ?? []).filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.map(\.stream))
+    }
+
+    static func transcribe(_ id: String, tracks: [Track], engines: PipelineEngines, heard: Set<StreamKind> = []) async throws -> Transcript {
         var words: [StreamKind: [Word]] = [:]
         var curves: [StreamKind: [Float]] = [:]
         for t in tracks {
             let curve = t.meetingCurve
             curves[t.kind] = curve
-            guard Loudness.passesGate(Loudness.curve(t.samples)) else {
+            guard heard.contains(t.kind) || Loudness.passesGate(Loudness.curve(t.samples)) else {
                 let own = Loudness.curve(t.samples)
                 let need = Loudness.requiredLoudSeconds(duration: Double(own.count) * Loudness.frameSeconds)
                 let line = Loudness.gateThreshold(own)

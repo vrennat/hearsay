@@ -92,6 +92,18 @@ final class LoudnessTests: XCTestCase {
     }
 }
 
+final class HeardStreamsTests: XCTestCase {
+    func testLiveWordsBypassGate() {
+        let t = Date(timeIntervalSince1970: 0)
+        XCTAssertEqual(ProcessPipeline.heardStreams(nil), [])
+        let live = LiveTranscript(updatedAt: t, lines: [
+            LiveLine(speaker: "mic-1", stream: .mic, start: 0, end: 1, text: "Hello, test recording."),
+            LiveLine(speaker: "system-1", stream: .system, start: 0, end: 1, text: "  "),
+        ])
+        XCTAssertEqual(ProcessPipeline.heardStreams(live), [.mic])
+    }
+}
+
 final class TitlerTests: XCTestCase {
     func testTitles() {
         let start = TestSupport.date("2026-10-22T16:05:00.000Z")
