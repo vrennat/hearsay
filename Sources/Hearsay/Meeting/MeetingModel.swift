@@ -125,6 +125,23 @@ final class MeetingModel {
         AppModel.shared.refreshRecent()
     }
 
+    /// A name naming guessed (or one from before guesses were recorded) that you have not confirmed.
+    func isGuess(_ speaker: String) -> Bool { meeting.nameIsGuess(speaker) }
+
+    /// Confirms a guessed name, so it helps recognise this voice in other meetings.
+    func confirm(_ speaker: String) {
+        guard let name = meeting.speakerNames[speaker] else { return }
+        do {
+            try NameReview.confirm([.init(meetingID: id, speaker: speaker)], name: name, store: store)
+            editError = nil
+            log.info("Confirmed \(speaker) in \(id)")
+        } catch {
+            editError = "Could not confirm the name: \(error)"
+            log.error("Confirm \(speaker) in \(id): \(error)")
+        }
+        reload()
+    }
+
     func rename(_ speaker: String, to name: String) {
         do {
             try MeetingEdits.rename(id: id, speaker: speaker, name: name, store: store)

@@ -180,6 +180,16 @@ struct SpeakerRowView: View {
                     .onSubmit { model.rename(row.id, to: text) }
                     .accessibilityLabel("Name for \(row.label)")
                     .help("Type a name and press Return to save")
+                if row.name != nil, model.isGuess(row.id) {
+                    HStack(spacing: 6) {
+                        Label("Guessed", systemImage: "questionmark.circle").font(.caption).foregroundStyle(.secondary)
+                        Spacer(minLength: 4)
+                        Button("Confirm", systemImage: "checkmark") { model.confirm(row.id) }
+                            .controlSize(.small)
+                            .help("This name is right. Confirmed names help recognise this voice in other meetings.")
+                    }
+                    .accessibilityElement(children: .contain)
+                }
             }
             if row.name == nil {
                 if let h = model.hints[row.id] {

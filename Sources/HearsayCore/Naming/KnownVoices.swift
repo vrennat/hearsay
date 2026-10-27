@@ -25,13 +25,12 @@ public enum KnownVoices {
     public static let minSamples = 2
 
     /// One sample per speaker you named (typed, live or after) with a voice, in every other meeting.
-    /// Guessed names (`Meeting.inferredSpeakers`) are skipped so a wrong guess cannot spread.
+    /// Guessed and unconfirmed old names (`Meeting.nameIsConfirmed`) are skipped so a wrong guess cannot spread.
     public static func samples(store: MeetingStore, excluding id: String? = nil) -> [Sample] {
         store.listMeetingIDs().filter { $0 != id }.flatMap { other -> [Sample] in
             guard let m = try? store.loadMeeting(other), let t = try? store.loadTranscript(other) else { return [] }
-            let guessed = Set(m.inferredSpeakers)
             return t.speakers.compactMap { s in
-                guard let v = s.voice, !guessed.contains(s.id),
+                guard let v = s.voice, m.nameIsConfirmed(s.id),
                       let n = m.speakerNames[s.id]?.trimmingCharacters(in: .whitespaces), !n.isEmpty else { return nil }
                 return Sample(name: n, stream: s.stream, voice: v, meetingID: other)
             }

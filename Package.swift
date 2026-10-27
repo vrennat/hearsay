@@ -14,6 +14,8 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/FluidInference/FluidAudio", exact: "0.17.7", traits: []),  // no traits: skips the unused NemoTextProcessing binary
         .package(url: "https://github.com/apple/swift-argument-parser", exact: "1.8.2"),
+        // Self-update for the Developer ID build; the App Store build strips it (scripts/build-app.sh --mas).
+        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.0"),
     ],
     targets: [
         .target(
@@ -25,7 +27,7 @@ let package = Package(
         .target(name: "CrashSupport", linkerSettings: [.linkedFramework("Foundation")]),
         .executableTarget(
             name: "Hearsay",
-            dependencies: ["HearsayCore", "CrashSupport"]
+            dependencies: ["HearsayCore", "CrashSupport", .product(name: "Sparkle", package: "Sparkle")]
         ),
         .executableTarget(
             name: "HearsayCLI",

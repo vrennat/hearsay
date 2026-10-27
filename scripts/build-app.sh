@@ -74,9 +74,13 @@ fi
 BUILD="${HEARSAY_BUILD_NUMBER:-$(git rev-list --count HEAD 2>/dev/null || echo 1)}"
 
 # --- Build -------------------------------------------------------------------------------------
-swift build -c release --product Hearsay
-swift build -c release --product hearsay-cli
-BIN="$(swift build -c release --show-bin-path)"
+# The App Store build compiles the updater out and drops the unused Sparkle load command; the store
+# updates it, and a self-updater would be rejected.
+SWIFT_FLAGS=()
+if (( MAS )); then SWIFT_FLAGS=(-Xswiftc -DHEARSAY_NO_SPARKLE -Xlinker -dead_strip_dylibs); fi
+swift build -c release --product Hearsay ${SWIFT_FLAGS[@]+"${SWIFT_FLAGS[@]}"}
+swift build -c release --product hearsay-cli ${SWIFT_FLAGS[@]+"${SWIFT_FLAGS[@]}"}
+BIN="$(swift build -c release --show-bin-path ${SWIFT_FLAGS[@]+"${SWIFT_FLAGS[@]}"})"
 
 STAGE="$ROOT/.build/app"
 APP="$STAGE/Hearsay.app"
@@ -93,8 +97,15 @@ for b in "$BIN"/*.bundle; do
   case "$(basename "$b")" in *Tests.bundle) continue ;; esac
   cp -R "$b" "$APP/Contents/Resources/"
 done
-# Dynamic frameworks: none today (FluidAudio links statically). Copy and add the rpath if any appear.
-frameworks=("$BIN"/*.framework)
+# Dynamic frameworks: Sparkle (Developer ID only; FluidAudio links statically).
+frameworks=()
+for f in "$BIN"/*.framework; do
+  if (( MAS )) && [[ "$(basename "$f")" == Sparkle.framework ]]; then continue; fi
+  frameworks+=("$f")
+done
+if (( MAS )) && otool -L "$BIN/Hearsay" | grep -q Sparkle.framework; then
+  echo "error: the App Store binary still links Sparkle" >&2; exit 1
+fi
 if (( ${#frameworks[@]} )); then
   mkdir -p "$APP/Contents/Frameworks"
   for f in "${frameworks[@]}"; do cp -R "$f" "$APP/Contents/Frameworks/"; done
@@ -120,6 +131,19 @@ for f in Assets.car AppIcon.icns; do
 done
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconName' "$ICON_PARTIAL")" == AppIcon ]] || { echo "error: unexpected actool partial plist" >&2; exit 1; }
 
+# Sparkle: feed = the latest release's appcast.xml; public key from Resources/sparkle-public-key.txt
+# (the private half lives in the release Mac's login Keychain, made by Sparkle's generate_keys).
+SPARKLE_KEYS=""
+SPARKLE_PUBKEY_FILE="$ROOT/Resources/sparkle-public-key.txt"
+if (( ! MAS )); then
+  if [[ -s "$SPARKLE_PUBKEY_FILE" ]]; then
+    SPARKLE_KEYS="  <key>SUFeedURL</key><string>https://github.com/vrennat/hearsay/releases/latest/download/appcast.xml</string>
+  <key>SUPublicEDKey</key><string>$(tr -d '[:space:]' < "$SPARKLE_PUBKEY_FILE")</string>
+  <key>SUEnableAutomaticChecks</key><true/>"
+  else
+    echo "note: no $SPARKLE_PUBKEY_FILE, so this build cannot update itself" >&2
+  fi
+fi
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -144,6 +168,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
   <key>ITSAppUsesNonExemptEncryption</key><false/>
   <key>NSCalendarsFullAccessUsageDescription</key><string>Hearsay reads the current calendar event to title meetings and list attendees.</string>
+$SPARKLE_KEYS
 </dict>
 </plist>
 PLIST
@@ -155,9 +180,10 @@ ENT="$STAGE/Hearsay.entitlements"
   echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">'
   echo '<plist version="1.0"><dict>'
   echo '  <key>com.apple.security.device.audio-input</key><true/>'
+  # Hardened runtime: without this the Developer ID build's calendar request is refused with no prompt.
+  echo '  <key>com.apple.security.personal-information.calendars</key><true/>'
   if (( MAS )); then
     echo '  <key>com.apple.security.app-sandbox</key><true/>'
-    echo '  <key>com.apple.security.personal-information.calendars</key><true/>'
     echo '  <key>com.apple.security.network.client</key><true/>'
     echo '  <key>com.apple.security.files.user-selected.read-write</key><true/>'
     echo '  <key>com.apple.security.files.bookmarks.app-scope</key><true/>'
@@ -176,6 +202,14 @@ fi
 
 if [[ -d "$APP/Contents/Frameworks" ]]; then
   for f in "$APP/Contents/Frameworks"/*; do
+    # Sparkle's helpers are signed inside out, never with --deep (Sparkle's sandboxing guide).
+    if [[ "$(basename "$f")" == Sparkle.framework ]]; then
+      S="$f/Versions/B"
+      codesign --force --options runtime "$TIMESTAMP" --sign "$IDENTITY" "$S/XPCServices/Installer.xpc"
+      codesign --force --options runtime "$TIMESTAMP" --sign "$IDENTITY" --preserve-metadata=entitlements "$S/XPCServices/Downloader.xpc"
+      codesign --force --options runtime "$TIMESTAMP" --sign "$IDENTITY" "$S/Autoupdate"
+      codesign --force --options runtime "$TIMESTAMP" --sign "$IDENTITY" "$S/Updater.app"
+    fi
     codesign --force --options runtime "$TIMESTAMP" --sign "$IDENTITY" "$f"
   done
 fi

@@ -7,6 +7,9 @@ struct MainMenuCommands: Commands {
     let model: AppModel
 
     var body: some Commands {
+        CommandGroup(after: .appInfo) {
+            if Updater.available { Button("Check for Updates…") { Updater.checkForUpdates() } }
+        }
         CommandGroup(replacing: .newItem) {
             Button("New Recording") {
                 MainWindowController.shared.show()
@@ -15,6 +18,7 @@ struct MainMenuCommands: Commands {
             .keyboardShortcut("n")
             .disabled(model.isRecording)
             Divider()
+            Button("Confirm Names…") { ConfirmNamesWindowController.shared.show() }
             Button("Open Meetings Folder") { NSWorkspace.shared.open(model.store.root) }
         }
         CommandGroup(after: .textEditing) {

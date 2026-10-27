@@ -30,9 +30,12 @@ public enum SpeakerIdentity {
             speakers: transcript.speakers, existing: meeting.speakerNames, live: live, me: me,
             attendees: meeting.attendees, title: meeting.title, voiceprintSamples: samples,
             knownVoices: knownVoices.map { $0.filter { $0.meetingID != meeting.id } } ?? KnownVoices.samples(store: store, excluding: meeting.id)))
-        // Guesses from earlier runs stay guesses while the name is unchanged.
-        let kept = meeting.inferredSpeakers.filter { out.names[$0] != nil && out.names[$0] == meeting.speakerNames[$0] }
+        // Guesses from earlier runs stay guesses while the name is unchanged. In an old meeting (no
+        // record) every name not confirmed is treated as a guess from here on.
+        let before = meeting
+        let kept = out.names.keys.filter { out.names[$0] == before.speakerNames[$0] && before.nameIsGuess($0) }
         meeting.inferredSpeakers = Array(Set(kept).union(out.inferred)).sorted()
+        meeting.confirmedSpeakers = []
         meeting.speakerNames = out.names
         for i in transcript.speakers.indices {
             let s = transcript.speakers[i]

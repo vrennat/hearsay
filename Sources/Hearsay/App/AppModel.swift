@@ -44,8 +44,18 @@ final class AppModel {
             self?.runRetentionNow {
                 self?.refreshRecent()
                 MainWindowModel.shared.reload(id)
+                self?.notifyGuesses(id)
             }
         }
+    }
+
+    /// After a meeting is transcribed: how many names were guessed, to confirm in the meeting view.
+    private func notifyGuesses(_ id: String) {
+        guard let m = try? store.loadMeeting(id) else { return }
+        let n = NameReview.guesses(in: m).count
+        guard n > 0 else { return }
+        Notifier.post(id: "names-\(id)", title: "\(n) name\(n == 1 ? "" : "s") to confirm",
+                      body: "\(m.title): Hearsay guessed \(n == 1 ? "a speaker's name" : "some speakers' names"). Confirm them in the meeting's speaker list.")
     }
 
     func didFinishLaunching() {
@@ -62,6 +72,7 @@ final class AppModel {
             Notifier.requestAuthorization()
             LaunchChecks.postCrashReports()
             DictationController.shared.settingsChanged()
+            if !CommandLine.arguments.contains(where: { $0.hasPrefix("--preview") }) { Updater.start() }
         }
         sleepGuard.recoverAfterCrash()
         MeetingPlayer.sweepPlaybackCopies()

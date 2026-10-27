@@ -112,6 +112,10 @@ enum StandardMenu {
                            help: "Show every meeting in the Hearsay window",
                            kind: .action { MainWindowController.shared.show() }))
         e.append(MenuEntry(id: "settings", title: "Settings…", symbol: "gearshape", key: ",", kind: .action(openSettings)))
+        if Updater.available {
+            e.append(MenuEntry(id: "update", title: "Check for Updates…", symbol: "arrow.down.circle",
+                               kind: .action { Updater.checkForUpdates() }))
+        }
         e.append(MenuEntry(id: "help", title: "Help", symbol: "questionmark.circle",
                            kind: .action { NSWorkspace.shared.open(MenuContent.helpURL) }))
         e.append(.divider("d-quit"))

@@ -62,6 +62,30 @@ struct RenameCommand: ParsableCommand {
     }
 }
 
+struct NamesCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "names",
+        abstract: "List guessed and unconfirmed names by person; --confirm NAME confirms that person everywhere.",
+        discussion: "Only confirmed names help recognise voices in other meetings.")
+    @Option(help: "Confirm every unconfirmed use of this name.") var confirm: String?
+    @Option(help: "Your name, left out of the list (default: none).") var me: String?
+    @OptionGroup var root: RootOption
+
+    mutating func run() throws {
+        let store = root.store
+        let people = NameReview.pending(store: store, me: me)
+        if let confirm {
+            guard let p = people.first(where: { $0.name.caseInsensitiveCompare(confirm) == .orderedSame }) else {
+                throw ValidationError("No unconfirmed name \(confirm)")
+            }
+            print("Confirmed \(try NameReview.confirm(p.entries, name: p.name, store: store)) uses of \(p.name)")
+            return
+        }
+        if people.isEmpty { print("No names to confirm."); return }
+        for p in people { print("\(p.name)\t\(p.entries.count) meeting\(p.entries.count == 1 ? "" : "s")") }
+    }
+}
+
 struct TitleCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "title",

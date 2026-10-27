@@ -21,8 +21,27 @@ public struct Meeting: Codable, Sendable, Equatable {
     public var titleEditedByUser: Bool
     /// Speaker ids whose name naming guessed (voiceprint, invite, known voice) rather than you typing
     /// it, live or after. Guesses are never used as samples for recognising voices in other meetings,
-    /// so one wrong guess cannot spread. Renaming a speaker removes it. Missing in old files = none.
-    public var inferredSpeakers: [String] = []
+    /// so one wrong guess cannot spread. Renaming or confirming a speaker removes it. **Nil** (missing,
+    /// every meeting before 0.1.3): nobody knows which names were guessed, so only `confirmedSpeakers`
+    /// count as yours. Omitted when nil, so re-saving an old meeting never claims its guesses were typed.
+    public var inferredSpeakers: [String]?
+    /// Old meetings only (`inferredSpeakers` nil): speakers whose name you confirmed or typed since.
+    public var confirmedSpeakers: [String] = []
+
+    /// Whether you typed or confirmed this speaker's name (so it may name voices in other meetings).
+    public func nameIsConfirmed(_ id: String) -> Bool {
+        guard speakerNames[id] != nil else { return false }
+        if let inferredSpeakers { return !inferredSpeakers.contains(id) }
+        return confirmedSpeakers.contains(id)
+    }
+
+    /// A name shown with a question mark until you confirm it.
+    public func nameIsGuess(_ id: String) -> Bool { speakerNames[id] != nil && !nameIsConfirmed(id) }
+
+    public mutating func confirmName(_ id: String) {
+        if inferredSpeakers != nil { inferredSpeakers?.removeAll { $0 == id } }
+        else if !confirmedSpeakers.contains(id) { confirmedSpeakers.append(id); confirmedSpeakers.sort() }
+    }
 
     public init(
         id: String, title: String, startedAt: Date, endedAt: Date? = nil,
@@ -37,11 +56,13 @@ public struct Meeting: Codable, Sendable, Equatable {
         self.speakerNames = speakerNames; self.echoCancellation = echoCancellation
         self.appVersion = appVersion; self.attendees = attendees; self.me = me
         self.audioRemovedAt = audioRemovedAt; self.titleEditedByUser = titleEditedByUser
+        // A new meeting records its guesses from the start; only decoding an old file leaves this nil.
+        self.inferredSpeakers = []
     }
 
     enum CodingKeys: String, CodingKey {
         case id, title, startedAt, endedAt, status, error, engine, streams, speakerNames
-        case echoCancellation, appVersion, attendees, me, audioRemovedAt, titleEditedByUser, inferredSpeakers
+        case echoCancellation, appVersion, attendees, me, audioRemovedAt, titleEditedByUser, inferredSpeakers, confirmedSpeakers
     }
 
     public init(from decoder: Decoder) throws {
@@ -61,7 +82,8 @@ public struct Meeting: Codable, Sendable, Equatable {
         me = try c.decodeIfPresent(String.self, forKey: .me)
         audioRemovedAt = try c.decodeIfPresent(Date.self, forKey: .audioRemovedAt)
         titleEditedByUser = try c.decodeIfPresent(Bool.self, forKey: .titleEditedByUser) ?? false
-        inferredSpeakers = try c.decodeIfPresent([String].self, forKey: .inferredSpeakers) ?? []
+        inferredSpeakers = try c.decodeIfPresent([String].self, forKey: .inferredSpeakers)
+        confirmedSpeakers = try c.decodeIfPresent([String].self, forKey: .confirmedSpeakers) ?? []
     }
 
     public var duration: TimeInterval? { endedAt.map { $0.timeIntervalSince(startedAt) } }

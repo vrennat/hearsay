@@ -8,7 +8,7 @@ public enum MeetingEdits {
         var m = try store.loadMeeting(id)
         let n = name.trimmingCharacters(in: .whitespaces)
         m.speakerNames[speaker] = n.isEmpty ? nil : n
-        m.inferredSpeakers.removeAll { $0 == speaker }
+        if !n.isEmpty { m.confirmName(speaker) }
         try store.saveMeeting(m)
         try IndexRenderer.reindex(store: store)
         return n

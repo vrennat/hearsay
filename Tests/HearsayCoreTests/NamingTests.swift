@@ -114,6 +114,7 @@ final class NamingTests: XCTestCase {
         }
         try add("a", ["sys-1": "Priya", "sys-2": " "], [s("sys-1", 5, voice: Self.axis(1)), s("sys-2", 5, voice: Self.axis(2)), s("sys-3", 5, voice: Self.axis(3))])
         try add("self", ["sys-1": "Omar"], [s("sys-1", 5, voice: Self.axis(4))])
+        for id in ["a", "self"] { var m = try store.loadMeeting(id); m.inferredSpeakers = []; try store.saveMeeting(m) }
         // A guessed name is never a sample.
         try add("guess", ["sys-1": "Sam"], [s("sys-1", 5, voice: Self.axis(6))])
         var g = try store.loadMeeting("guess"); g.inferredSpeakers = ["sys-1"]; try store.saveMeeting(g)
@@ -122,6 +123,12 @@ final class NamingTests: XCTestCase {
         // Renaming by hand makes it a typed name again.
         _ = try MeetingEdits.rename(id: "guess", speaker: "sys-1", name: "Sam", store: store)
         XCTAssertEqual(try store.loadMeeting("guess").inferredSpeakers, [])
+        // An old meeting (no record of guesses) counts only once confirmed.
+        try add("old", ["sys-1": "Kim"], [s("sys-1", 5, voice: Self.axis(7))])
+        var old = try store.loadMeeting("old"); old.inferredSpeakers = nil; try store.saveMeeting(old)
+        XCTAssertFalse(KnownVoices.samples(store: store).contains { $0.meetingID == "old" })
+        try NameReview.confirm([.init(meetingID: "old", speaker: "sys-1")], name: "Kim", store: store)
+        XCTAssertTrue(KnownVoices.samples(store: store).contains { $0.meetingID == "old" && $0.name == "Kim" })
     }
 
     // MARK: Priority and 1:1 rules
@@ -204,5 +211,46 @@ final class NamingTests: XCTestCase {
             Speaker(id: "sys-1", stream: .system, defaultLabel: "Remote 1", talkSeconds: 4),
         ], utterances: utts)
         XCTAssertEqual(LiveNameMapper.map(live: live, transcript: t), ["mic-2": "Nate"])
+    }
+
+    // MARK: Confirming names
+
+    func testOldMeetingsKeepNoRecordAndReSaveDoesNotInventOne() throws {
+        let json = #"{"title":"x","startedAt":"2026-10-01T10:00:00Z","status":"done","speakerNames":{"sys-1":"Priya"}}"#
+        let m = try JSONCoding.decoder().decode(Meeting.self, from: Data(json.utf8))
+        XCTAssertNil(m.inferredSpeakers)
+        XCTAssertTrue(m.nameIsGuess("sys-1"))
+        let again = try JSONCoding.decoder().decode(Meeting.self, from: try JSONCoding.encoder().encode(m))
+        XCTAssertNil(again.inferredSpeakers)
+        var c = again; c.confirmName("sys-1")
+        XCTAssertTrue(c.nameIsConfirmed("sys-1"))
+        var n = Meeting(id: "n", title: "n", startedAt: Date(), status: .done, speakerNames: ["sys-1": "Jo", "sys-2": "Al"])
+        n.inferredSpeakers = ["sys-2"]
+        XCTAssertTrue(n.nameIsConfirmed("sys-1")); XCTAssertTrue(n.nameIsGuess("sys-2"))
+        n.confirmName("sys-2"); XCTAssertEqual(n.inferredSpeakers, [])
+    }
+
+    func testPendingGroupsByPersonAndConfirmAll() throws {
+        let store = MeetingStore(root: try TestSupport.tempRoot())
+        func add(_ id: String, _ names: [String: String], inferred: [String]?) throws {
+            try FileManager.default.createDirectory(at: store.folder(id), withIntermediateDirectories: true)
+            var m = Meeting(id: id, title: id, startedAt: Date(), status: .done, speakerNames: names)
+            m.inferredSpeakers = inferred
+            try store.saveMeeting(m)
+        }
+        try add("a", ["sys-1": "Priya", "mic-1": "Tanner"], inferred: nil)
+        try add("b", ["sys-2": "priya", "sys-1": "Sam"], inferred: ["sys-2"])
+        try add("c", ["sys-1": "Priya"], inferred: [])
+        // Tanner is you; Sam is typed in a recorded meeting; Priya is unconfirmed in "a" (old) and "b" (guess).
+        let p = NameReview.pending(store: store, me: "Tanner Vass")
+        XCTAssertEqual(p.map(\.name), ["Priya"])
+        XCTAssertEqual(p[0].entries, [.init(meetingID: "a", speaker: "sys-1"), .init(meetingID: "b", speaker: "sys-2")])
+        XCTAssertEqual(try NameReview.confirm(p[0].entries, name: p[0].name, store: store), 2)
+        XCTAssertEqual(NameReview.pending(store: store, me: "Tanner"), [])
+        XCTAssertEqual(try store.loadMeeting("a").confirmedSpeakers, ["sys-1"])
+        XCTAssertEqual(try store.loadMeeting("b").inferredSpeakers, [])
+        // A name changed since the list was made is not confirmed.
+        try add("d", ["sys-1": "Ray"], inferred: ["sys-1"])
+        XCTAssertEqual(try NameReview.confirm([.init(meetingID: "d", speaker: "sys-1")], name: "Priya", store: store), 0)
     }
 }

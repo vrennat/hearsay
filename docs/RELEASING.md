@@ -61,3 +61,24 @@ before notarizing if it does not.
 
 `brew uninstall --cask hearsay` removes the app and the symlink. `brew uninstall --zap --cask hearsay` also
 removes the log, the preferences and the FluidAudio models. `~/Meetings` is never removed.
+
+## Sparkle (self-update)
+
+The Developer ID build updates itself with Sparkle 2. The feed is
+`https://github.com/vrennat/hearsay/releases/latest/download/appcast.xml`; `scripts/release.sh` writes
+`appcast.xml` (one item: the release being published), signs the zip with `sign_update`, and attaches
+both files to the GitHub release. The App Store build compiles the updater out (`HEARSAY_NO_SPARKLE`) and
+ships without the framework.
+
+One-time setup on the release Mac (the private key never leaves its login Keychain):
+
+    swift package resolve
+    .build/artifacts/sparkle/Sparkle/bin/generate_keys            # creates the key, prints the public key
+    .build/artifacts/sparkle/Sparkle/bin/generate_keys -p > Resources/sparkle-public-key.txt
+    git add Resources/sparkle-public-key.txt && git commit -m "chore: Sparkle public key"
+
+Back the private key up (`generate_keys -x sparkle-private-key.txt`, then store that file in a password
+manager and delete it). **Losing it means no installed copy can be updated again**: every user would have
+to reinstall by hand. `release.sh` refuses to run without `Resources/sparkle-public-key.txt`. The cask
+says `auto_updates true`, so `brew upgrade` leaves updating to the app.
+

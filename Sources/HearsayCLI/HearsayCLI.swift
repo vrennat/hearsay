@@ -8,7 +8,7 @@ struct HearsayCLI: AsyncParsableCommand {
         commandName: "hearsay",
         abstract: "Hearsay meeting tools. Every command takes --root (default ~/Meetings).",
         version: HearsayCore.version,
-        subcommands: [Import.self, ProcessCommand.self, CleanupCommand.self, CompressCommand.self, RenameCommand.self, TitleCommand.self, VoicesCommand.self, Speakers.self, Hints.self, SummariesCommand.self, RetentionCommand.self, Dictate.self, LiveSim.self, Reindex.self, LockCommand.self, UnlockCommand.self, ExportCommand.self]
+        subcommands: [Import.self, ProcessCommand.self, CleanupCommand.self, CompressCommand.self, RenameCommand.self, NamesCommand.self, TitleCommand.self, VoicesCommand.self, Speakers.self, Hints.self, SummariesCommand.self, RetentionCommand.self, Dictate.self, LiveSim.self, Reindex.self, LockCommand.self, UnlockCommand.self, ExportCommand.self]
     )
 
     mutating func run() async throws {
