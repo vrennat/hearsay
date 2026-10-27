@@ -5,6 +5,29 @@ final class LiveNameMapperTests: XCTestCase {
     typealias M = LiveNameMapper
     func span(_ a: Double, _ b: Double) -> M.Span { M.Span(a, b) }
 
+    /// The old app's `live.json` (shape copied from a real old-app meeting, names invented).
+    func testOldAppLiveFormatCarriesNames() throws {
+        let json = """
+        {"names": [{"name": "Dana Ruiz", "voice": {"slot": 0, "stream": "system"}},
+                   {"name": "Kim", "voice": {"slot": 1, "stream": "system"}}],
+         "spans": [{"start": 1.0, "end": 9.0, "voice": {"slot": 0, "stream": "system"}},
+                   {"start": 10.0, "end": 18.0, "voice": {"slot": 1, "stream": "system"}},
+                   {"start": 0.5, "end": 4.0, "voice": {"slot": 0, "stream": "mic"}}]}
+        """
+        let live = try JSONDecoder().decode(LiveTranscript.self, from: Data(json.utf8))
+        XCTAssertEqual(live.speakerNames, ["sys-1": "Dana Ruiz", "sys-2": "Kim"])
+        XCTAssertEqual(live.lines.map(\.speaker), ["sys-1", "sys-2", "mic-1"])
+        XCTAssertEqual(live.lines[2].stream, .mic)
+        let t = Transcript(engine: "parakeet", processedAt: Date(), speakers: [
+            Speaker(id: "sys-1", stream: .system, defaultLabel: "Remote 1", talkSeconds: 8),
+            Speaker(id: "sys-2", stream: .system, defaultLabel: "Remote 2", talkSeconds: 8),
+        ], utterances: [
+            Utterance(speaker: "sys-2", stream: .system, start: 1.2, end: 8.8, text: "a"),
+            Utterance(speaker: "sys-1", stream: .system, start: 10.1, end: 17.9, text: "b"),
+        ])
+        XCTAssertEqual(LiveNameMapper.map(live: live, transcript: t), ["sys-2": "Dana Ruiz", "sys-1": "Kim"])
+    }
+
     func testOneToOne() {
         let live = [M.LiveVoice(id: "mic-1", stream: .mic, name: "Tanner", spans: [span(0, 10)]),
                     M.LiveVoice(id: "sys-1", stream: .system, name: "Priya", spans: [span(10, 20)])]

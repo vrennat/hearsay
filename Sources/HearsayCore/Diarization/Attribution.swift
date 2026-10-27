@@ -31,10 +31,23 @@ public enum Attribution {
     /// Speaker ids for one stream: slots ranked by talk time (attributed word time), `mic-1` first.
     /// Returns utterances (already split into runs of one speaker, then by `Segmenter`) and speakers
     /// with talk seconds taken from the utterances.
+    /// A slot with less word time than this and under 5% of its stream is folded into the nearest
+    /// other slot: the offline diarizer splits off a few seconds of one voice (a 4 s "Room 2" on a
+    /// one-person mic track) far more often than someone speaks only one short phrase.
+    public static let minSlotSeconds = 5.0
+
     public static func build(words: [Word], segments: [DiarSegment], stream: StreamKind) -> (speakers: [Speaker], utterances: [Utterance]) {
-        let slots = words.map { slot(for: $0, in: segments) }
+        var slots = words.map { slot(for: $0, in: segments) }
         var wordTime: [String: Double] = [:]
         for (w, s) in zip(words, slots) { wordTime[s, default: 0] += w.end - w.start }
+        let total = wordTime.values.reduce(0, +)
+        let tiny = Set(wordTime.filter { $0.value < minSlotSeconds && $0.value < total * SpeakerSummary.mainShare }.keys)
+        let kept = segments.filter { !tiny.contains($0.slot) }
+        if !tiny.isEmpty, !kept.isEmpty {
+            slots = zip(words, slots).map { w, s in tiny.contains(s) ? slot(for: w, in: kept) : s }
+            wordTime = [:]
+            for (w, s) in zip(words, slots) { wordTime[s, default: 0] += w.end - w.start }
+        }
         let ranked = wordTime.sorted { $0.value > $1.value || ($0.value == $1.value && $0.key < $1.key) }.map(\.key)
         let prefix = stream == .mic ? "mic" : "sys"
         let idFor = Dictionary(uniqueKeysWithValues: ranked.enumerated().map { ($0.element, "\(prefix)-\($0.offset + 1)") })

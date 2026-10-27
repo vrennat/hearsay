@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import HearsayCore
 
-/// Debug launch: `--preview-pill [--preview-elapsed SECONDS] [--preview-expanded] [--preview-pill-state nomic]
+/// Debug launch: `--preview-pill [--preview-elapsed SECONDS] [--preview-expanded] [--preview-pill-state nomic|over]
 /// [--preview-snapshot PNG]` shows the pill with a
 /// synthetic level and no recording, so it can be looked at and screenshotted. With
 /// `--preview-elapsed` the clock is frozen at that value (deterministic screenshots); without, it runs.
@@ -22,8 +22,12 @@ enum PillPreview {
         m.elapsed = fixed ?? 0
         // `--preview-pill-state nomic`: the 10 s mic-silence warning ("No mic" in place of the meter).
         if let i = args.firstIndex(of: "--preview-pill-state"), i + 1 < args.count, args[i + 1] == "nomic" { m.warning = true }
+        // `--preview-pill-state over`: the "Meeting over?" prompt (implies expanded).
+        if let i = args.firstIndex(of: "--preview-pill-state"), i + 1 < args.count, args[i + 1] == "over" {
+            m.endPrompt = "Nothing heard for 5 minutes."
+        }
         NotchPillController.shared.show(model: m)
-        if expanded { NotchPillController.shared.setExpanded(true) }
+        if expanded || m.endPrompt != nil { NotchPillController.shared.setExpanded(true) }
         HSLog("pill").info("Preview pill (elapsed \(fixed.map { "\($0)" } ?? "running"), expanded \(expanded))")
         if let i = args.firstIndex(of: "--preview-snapshot"), i + 1 < args.count {
             let url = URL(fileURLWithPath: args[i + 1])

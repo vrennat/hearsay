@@ -19,6 +19,10 @@ public struct Meeting: Codable, Sendable, Equatable {
     /// Set when the user typed the title (window or `hearsay title <id> <title>`); such a meeting is
     /// never retitled by `TitleGenerator`. Missing in older folders, read as false.
     public var titleEditedByUser: Bool
+    /// Speaker ids whose name naming guessed (voiceprint, invite, known voice) rather than you typing
+    /// it, live or after. Guesses are never used as samples for recognising voices in other meetings,
+    /// so one wrong guess cannot spread. Renaming a speaker removes it. Missing in old files = none.
+    public var inferredSpeakers: [String] = []
 
     public init(
         id: String, title: String, startedAt: Date, endedAt: Date? = nil,
@@ -37,7 +41,7 @@ public struct Meeting: Codable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case id, title, startedAt, endedAt, status, error, engine, streams, speakerNames
-        case echoCancellation, appVersion, attendees, me, audioRemovedAt, titleEditedByUser
+        case echoCancellation, appVersion, attendees, me, audioRemovedAt, titleEditedByUser, inferredSpeakers
     }
 
     public init(from decoder: Decoder) throws {
@@ -57,6 +61,7 @@ public struct Meeting: Codable, Sendable, Equatable {
         me = try c.decodeIfPresent(String.self, forKey: .me)
         audioRemovedAt = try c.decodeIfPresent(Date.self, forKey: .audioRemovedAt)
         titleEditedByUser = try c.decodeIfPresent(Bool.self, forKey: .titleEditedByUser) ?? false
+        inferredSpeakers = try c.decodeIfPresent([String].self, forKey: .inferredSpeakers) ?? []
     }
 
     public var duration: TimeInterval? { endedAt.map { $0.timeIntervalSince(startedAt) } }

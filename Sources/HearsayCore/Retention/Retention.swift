@@ -1,7 +1,7 @@
 import Foundation
 
 /// Storage retention (spec, Retention). Decided by `startedAt` age; 0 days means forever and
-/// `RetentionPlan.untilTranscribed` (-1, the audio default) removes audio as soon as a transcript exists.
+/// `RetentionPlan.untilTranscribed` (-1, chosen in Settings) removes audio as soon as a transcript exists.
 public enum RetentionAction: String, Sendable, Equatable {
     /// Past the transcript limit: move the whole folder to the Trash.
     case trash

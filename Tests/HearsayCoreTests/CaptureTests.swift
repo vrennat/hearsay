@@ -85,6 +85,18 @@ import Testing
         #expect(l.displayLevel(now: 11.31) == AudioLevel.floor)
     }
 
+    @Test func hearingHoldsThroughShortPauses() {
+        var l = AudioLevel()
+        #expect(!l.isHearing(now: 0))
+        l.record(dBFS: -40, at: 10)
+        l.record(dBFS: -63, at: 10.5)  // quiet buffers between words
+        #expect(l.isHearing(now: 11.0))
+        #expect(l.isHearing(now: 11.49))
+        #expect(!l.isHearing(now: 11.5))
+        #expect(l.isFlowing(now: 11.9))
+        #expect(!l.isFlowing(now: 12.0))
+    }
+
     @Test func dBFSOfFullScaleSquareIsZero() {
         let samples = [Float](repeating: 1, count: 100)
         samples.withUnsafeBufferPointer { p in

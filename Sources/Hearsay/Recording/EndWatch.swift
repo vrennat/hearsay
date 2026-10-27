@@ -19,6 +19,8 @@ final class EndWatch {
     private var lastSystemLoud: Double?
     private var callAudio: Bool?
     private var meetingID: String?
+    /// Shows the prompt in the app too (the notch pill): with notifications denied the banner never appears.
+    var onPrompt: (String) -> Void = { _ in }
 
     static func registerCategory() {
         let stop = UNNotificationAction(identifier: stopAction, title: "Stop", options: [])
@@ -26,8 +28,9 @@ final class EndWatch {
         let cat = UNNotificationCategory(identifier: category, actions: [stop, keep], intentIdentifiers: [], options: [])
         NotificationRouter.shared.register(cat) { action, request in
             let id = request.content.userInfo["meetingID"] as? String
-            guard action == stopAction else { return }
+            // A banner from an earlier meeting must not answer this meeting's prompt.
             guard let s = AppModel.shared.session, (id ?? "").isEmpty || s.meetingID == id else { return }
+            guard action == stopAction else { RecordingUI.shared.clearEndPrompt(); return }
             AppModel.shared.stop(reason: "Meeting over? -> Stop")
         }
     }
@@ -68,6 +71,7 @@ final class EndWatch {
         }
         log.info("Meeting over? (\(p.reason.rawValue) at \(Int(p.at)) s)")
         Announce.post("Meeting over? \(body) Still recording.")
+        onPrompt(body)
         guard NotificationRouter.available else { return }
         let content = UNMutableNotificationContent()
         content.title = "Meeting over?"

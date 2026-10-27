@@ -41,7 +41,22 @@ final class RecordingUI {
         return t
     }
 
+    /// "Meeting over?" in the pill, beside the notification. Without the pill only the notification shows.
+    private func showEndPrompt(_ reason: String) {
+        guard let pill else { return }
+        pill.endPrompt = reason
+        NotchPillController.shared.setExpanded(true)
+    }
+
+    func clearEndPrompt() {
+        guard let pill, pill.endPrompt != nil else { return }
+        pill.endPrompt = nil
+        NotchPillController.shared.setExpanded(false)
+        log.info("Meeting over? -> Keep going")
+    }
+
     func didStart(_ s: RecordingSession, event: CalendarPick.Event?) {
+        endWatch.onPrompt = { [weak self] in self?.showEndPrompt($0) }
         if let event { s.adoptCalendar(attendees: event.attendees, me: event.me) }
         let calendarEnd = event.map { $0.end.timeIntervalSince(s.startedAt) }
         endWatch.begin(meetingID: s.meetingID, startHost: s.startHostTime, calendarEnd: calendarEnd)
@@ -52,6 +67,7 @@ final class RecordingUI {
             let m = PillModel(levels: Self.liveLevels)
             m.title = s.meeting.title
             m.onStop = { AppModel.shared.stop(reason: "pill Stop") }
+            m.onKeepGoing = { RecordingUI.shared.clearEndPrompt() }
             pill = m
             lastPillSecond = -1
             NotchPillController.shared.show(model: m)
@@ -85,6 +101,7 @@ final class RecordingUI {
         let previous = finishing
         finishing = Task {
             await previous?.value
+            await LiveModel.shared.flushRenames()
             await LiveFeed.shared.finish()
             processed()
         }

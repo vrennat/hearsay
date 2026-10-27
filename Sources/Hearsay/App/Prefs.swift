@@ -22,10 +22,10 @@ enum Prefs {
 
     static var encryptRecordingsOn: Bool { defaults.object(forKey: encryptRecordings) as? Bool ?? true }
 
-    /// Audio is deleted as soon as the meeting is transcribed unless the user chooses to keep it
-    /// (spec amendment); transcripts are kept forever (0). `integer(forKey:)` would read an unset key
+    /// Audio and transcripts are kept forever (0) unless the user picks a limit: an earlier
+    /// "Until transcribed" default deleted the audio of every existing meeting at first launch. `integer(forKey:)` would read an unset key
     /// as 0 = forever, so every reader goes through these.
-    static let defaultKeepAudioDays = RetentionPlan.untilTranscribed
+    static let defaultKeepAudioDays = 0
     static let defaultKeepTranscriptDays = 0
     static var keepAudioDaysValue: Int { defaults.object(forKey: keepAudioDays) as? Int ?? defaultKeepAudioDays }
     static var keepTranscriptDaysValue: Int { defaults.object(forKey: keepTranscriptDays) as? Int ?? defaultKeepTranscriptDays }

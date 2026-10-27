@@ -59,6 +59,12 @@ enum MenuPreview {
             // The Live window as opened from the menu (empty unless a recording is running).
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
+                    // Sample lines so the speaker list and its name fields have something to show.
+                    LiveModel.shared.update([
+                        LiveLine(speaker: "mic-1", stream: .mic, start: 2, end: 6, text: "Morning, Priya, can you hear me?"),
+                        LiveLine(speaker: "sys-1", stream: .system, start: 7, end: 12, text: "Loud and clear. Omar is joining late."),
+                        LiveLine(speaker: "sys-2", stream: .system, start: 13, end: 19, text: "Sorry, I'm here now."),
+                    ])
                     guard let w = LiveWindowController.shared.show() else { return }
                     if args.contains("--preview-dark") { w.appearance = NSAppearance(named: .darkAqua) }
                     guard let path = value("--preview-snapshot") else { return }
@@ -76,7 +82,7 @@ enum MenuPreview {
         let title: String
         if args.contains("--preview-menu") {
             if args.contains("--preview-menu-recording") {
-                recording = MenuRecording(title: "Weekly design sync", elapsed: 760, micLevel: -22, systemLevel: -30, warnings: [])
+                recording = MenuRecording(title: "Weekly design sync", elapsed: 760, micLevel: -22, systemLevel: -30, warnings: [], micActive: true, callActive: true)
             }
             let hover: MenuControl? = switch value("--preview-menu-hover") {
             case "mic": .mic

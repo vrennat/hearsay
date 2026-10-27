@@ -31,9 +31,12 @@ public enum VoiceBackfill {
             plans.append((id, m, t0, t))
         }
         var rows: [Row] = []
+        // Taken once, before any meeting is renamed: a guess made in this run never names the next meeting.
+        let known = KnownVoices.samples(store: store)
+        HSLog("voices").info("Known voices: \(known.count) samples, \(Set(known.map { $0.name.lowercased() }).count) names")
         for (id, m0, t0, t1) in plans {
             var m = m0, t = t1
-            SpeakerIdentity.name(&t, meeting: &m, store: store, userName: userName)
+            SpeakerIdentity.name(&t, meeting: &m, store: store, userName: userName, knownVoices: known)
             for s in t.speakers {
                 let voice = s.voice == nil ? "no voice" : (t0.speaker(s.id)?.voice == nil ? "new voice" : "voice")
                 rows.append(Row(meetingID: id, speaker: s.id, label: s.defaultLabel, name: m.speakerNames[s.id],

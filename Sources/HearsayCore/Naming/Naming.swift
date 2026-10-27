@@ -1,7 +1,8 @@
 import Foundation
 
 /// Speaker naming in spec priority order (step 7): names already in `meeting.json`; live names;
-/// then the voiceprint and the invite fill speakers still unnamed with names not already used.
+/// then the voiceprint and the invite; then voices named in other meetings (`KnownVoices`) fill
+/// speakers still unnamed, always with names not already used.
 public enum Naming {
     public struct Input: Sendable {
         public var speakers: [Speaker]
@@ -13,11 +14,15 @@ public enum Naming {
         public var attendees: [String]
         public var title: String
         public var voiceprintSamples: [[Float]]
+        /// Named voices from other meetings (`KnownVoices.samples`), for everyone else.
+        public var knownVoices: [KnownVoices.Sample]
 
         public init(speakers: [Speaker], existing: [String: String] = [:], live: [String: String] = [:], me: String?,
-                    attendees: [String] = [], title: String = "", voiceprintSamples: [[Float]] = []) {
+                    attendees: [String] = [], title: String = "", voiceprintSamples: [[Float]] = [],
+                    knownVoices: [KnownVoices.Sample] = []) {
             self.speakers = speakers; self.existing = existing; self.live = live; self.me = me
             self.attendees = attendees; self.title = title; self.voiceprintSamples = voiceprintSamples
+            self.knownVoices = knownVoices
         }
     }
 
@@ -25,15 +30,27 @@ public enum Naming {
         public var names: [String: String]
         /// The speaker that is you (voiceprint, an existing name, or the 1:1 one-mic-voice rule).
         public var me: String?
+        /// Speakers this run named by guessing (voiceprint, invite, known voice), not from typed or live names.
+        public var inferred: Set<String> = []
     }
 
     public static func name(_ input: Input) -> Output {
         let ids = Set(input.speakers.map(\.id))
         var names = input.existing.filter { !$0.value.trimmingCharacters(in: .whitespaces).isEmpty }
-        func used(_ n: String) -> Bool { names.values.contains { $0.caseInsensitiveCompare(n) == .orderedSame } }
-        func fill(_ id: String, _ n: String) { if ids.contains(id), names[id] == nil, !used(n) { names[id] = n } }
+        // A guess is compared by first name ("Jordan Kim" from the invite and "Jordan" from a known voice
+        // are one person); typed and live names only by the whole name, since two real Alexes happen.
+        func used(_ n: String, byFirstName: Bool) -> Bool {
+            names.values.contains { byFirstName ? firstName($0).lowercased() == firstName(n).lowercased()
+                                                : $0.caseInsensitiveCompare(n) == .orderedSame }
+        }
+        var inferred = Set<String>()
+        func fill(_ id: String, _ n: String, guessed: Bool = true) {
+            guard ids.contains(id), names[id] == nil, !used(n, byFirstName: guessed) else { return }
+            names[id] = n
+            if guessed { inferred.insert(id) }
+        }
 
-        for (id, n) in input.live.sorted(by: { $0.key < $1.key }) { fill(id, n) }
+        for (id, n) in input.live.sorted(by: { $0.key < $1.key }) { fill(id, n, guessed: false) }
 
         let main = mainSpeakers(input.speakers)
         let myFirst = input.me.map(firstName).flatMap { $0.isEmpty ? nil : $0 }
@@ -51,7 +68,15 @@ public enum Naming {
                 if candidates.count == 1 { fill(candidates[0].id, displayName(others[0], title: input.title)) }
             }
         }
-        return Output(names: names, me: meID)
+        // Your own name is the voiceprint's job, so it is never handed out by voice here.
+        let others = input.speakers.filter { names[$0.id] == nil && $0.id != meID }
+        let taken = Set(names.values).union(myFirst.map { [$0] } ?? [])
+        let mine = myFirst?.lowercased()
+        let known = input.knownVoices.filter { firstName($0.name).lowercased() != mine }
+        // Every voice in the meeting takes part in the ambiguity check, named or not.
+        for (id, n) in KnownVoices.match(speakers: input.speakers, samples: known, taken: taken,
+                                         eligible: Set(others.map(\.id))) { fill(id, n) }
+        return Output(names: names, me: meID, inferred: inferred)
     }
 
     /// Speakers with at least 5% of their stream's talk time.

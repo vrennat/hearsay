@@ -11,13 +11,33 @@ public struct LiveTranscript: Codable, Sendable, Equatable {
         self.updatedAt = updatedAt; self.speakerNames = speakerNames; self.lines = lines
     }
 
-    enum CodingKeys: String, CodingKey { case updatedAt, speakerNames, lines }
+    enum CodingKeys: String, CodingKey { case updatedAt, speakerNames, lines, names, spans }
+
+    /// The old app's shape: `names: [{name, voice: {slot, stream}}]` and `spans: [{start, end, voice}]`,
+    /// no text, 0-based slots. Read into the same ids (`sys-1` is old slot 0) so `LiveNameMapper` can
+    /// carry its names into the final transcript. Checked against a real old-app sync (2026-10-23).
+    struct OldVoice: Decodable { var slot: Int; var stream: StreamKind; var id: String { "\(stream == .mic ? "mic" : "sys")-\(slot + 1)" } }
+    struct OldName: Decodable { var name: String; var voice: OldVoice }
+    struct OldSpan: Decodable { var start: Double; var end: Double; var voice: OldVoice }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date(timeIntervalSince1970: 0)
         speakerNames = try c.decodeIfPresent([String: String].self, forKey: .speakerNames) ?? [:]
         lines = try c.decodeIfPresent([LiveLine].self, forKey: .lines) ?? []
+        if speakerNames.isEmpty, let old = try? c.decodeIfPresent([OldName].self, forKey: .names) {
+            for n in old where !n.name.trimmingCharacters(in: .whitespaces).isEmpty { speakerNames[n.voice.id] = n.name }
+        }
+        if lines.isEmpty, let old = try? c.decodeIfPresent([OldSpan].self, forKey: .spans) {
+            lines = old.map { LiveLine(speaker: $0.voice.id, stream: $0.voice.stream, start: $0.start, end: $0.end, text: "") }
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(updatedAt, forKey: .updatedAt)
+        try c.encode(speakerNames, forKey: .speakerNames)
+        try c.encode(lines, forKey: .lines)
     }
 }
 

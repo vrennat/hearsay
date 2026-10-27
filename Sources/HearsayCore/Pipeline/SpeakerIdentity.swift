@@ -19,13 +19,20 @@ public enum SpeakerIdentity {
     }
 
     /// Runs naming, writes the names into `meeting.speakerNames` and labels the speaker that is you `Me`.
-    public static func name(_ transcript: inout Transcript, meeting: inout Meeting, store: MeetingStore, userName: String?) {
+    /// `knownVoices`: pass samples taken once before a backfill run (so one meeting's guesses never feed
+    /// the next, and transcripts are read once); nil reads them from the store.
+    public static func name(_ transcript: inout Transcript, meeting: inout Meeting, store: MeetingStore, userName: String?,
+                            knownVoices: [KnownVoices.Sample]? = nil) {
         let me = meeting.me ?? userName
         let live = (try? store.loadLive(meeting.id)).flatMap { $0 }.map { LiveNameMapper.map(live: $0, transcript: transcript) } ?? [:]
         let samples = me.map { Voiceprint.samples(store: store, firstName: Naming.firstName($0), excluding: meeting.id) } ?? []
         let out = Naming.name(Naming.Input(
             speakers: transcript.speakers, existing: meeting.speakerNames, live: live, me: me,
-            attendees: meeting.attendees, title: meeting.title, voiceprintSamples: samples))
+            attendees: meeting.attendees, title: meeting.title, voiceprintSamples: samples,
+            knownVoices: knownVoices.map { $0.filter { $0.meetingID != meeting.id } } ?? KnownVoices.samples(store: store, excluding: meeting.id)))
+        // Guesses from earlier runs stay guesses while the name is unchanged.
+        let kept = meeting.inferredSpeakers.filter { out.names[$0] != nil && out.names[$0] == meeting.speakerNames[$0] }
+        meeting.inferredSpeakers = Array(Set(kept).union(out.inferred)).sorted()
         meeting.speakerNames = out.names
         for i in transcript.speakers.indices {
             let s = transcript.speakers[i]

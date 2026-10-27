@@ -44,6 +44,19 @@ final class AttributionTests: XCTestCase {
         XCTAssertEqual(speakers[0].talkSeconds, 2, accuracy: 1e-9)
     }
 
+    func testTinySlotFoldsIntoNeighbour() {
+        // One voice for 200 s, with the diarizer splitting off 1 s as slot B.
+        let segs = [DiarSegment(slot: "A", start: 0, end: 100), DiarSegment(slot: "B", start: 100, end: 101), DiarSegment(slot: "A", start: 101, end: 200)]
+        let words = stride(from: 0.0, to: 200, by: 0.5).map { Word(text: "w", start: $0, end: $0 + 0.4) }
+        let (speakers, utts) = Attribution.build(words: words, segments: segs, stream: .mic)
+        XCTAssertEqual(speakers.map(\.id), ["mic-1"])
+        XCTAssertEqual(Set(utts.map(\.speaker)), ["mic-1"])
+        // A short slot that is a real share of a short meeting stays.
+        let short = [DiarSegment(slot: "A", start: 0, end: 10), DiarSegment(slot: "B", start: 10, end: 13)]
+        let w2 = stride(from: 0.0, to: 13, by: 0.5).map { Word(text: "w", start: $0, end: $0 + 0.4) }
+        XCTAssertEqual(Attribution.build(words: w2, segments: short, stream: .mic).speakers.count, 2)
+    }
+
     func testCleanSpansSkipOverlapAndShortTurns() {
         let u = [
             Utterance(speaker: "mic-1", stream: .mic, start: 0, end: 3, text: "a"),

@@ -41,8 +41,9 @@ final class RecordingSession {
     private(set) var systemActivity = AudioLevel()
     private(set) var warnings: Set<Warning> = []
 
-    var micActive: Bool { micLevel > AudioLevel.floor }
-    var callActive: Bool { systemLevel > AudioLevel.floor }
+    /// Held for `AudioLevel.activeHold` so the menu's Hearing/Quiet word does not flicker.
+    private(set) var micActive = false
+    private(set) var callActive = false
 
     private let mic: MicCapture
     private let tap: SystemTapCapture
@@ -112,6 +113,8 @@ final class RecordingSession {
         systemActivity = s
         micLevel = m.displayLevel(now: now)
         systemLevel = s.displayLevel(now: now)
+        micActive = m.isHearing(now: now)
+        callActive = s.isFlowing(now: now)
         RecordingUI.shared.tick(self, nowHost: now, mic: m, system: s, callAppAudio: callApps.callAppAudio)
 
         // Mic watchdog: no buffer for 10 s -> warn, notify once, retry every 10 s; clear on return.

@@ -11,7 +11,10 @@ final class PillModel {
     var warning = false
     var expanded = false
     var active = true
+    /// "Meeting over?" reason while the end prompt is up; the pill stays expanded until it is answered.
+    var endPrompt: String?
     @ObservationIgnored var onStop: () -> Void = {}
+    @ObservationIgnored var onKeepGoing: () -> Void = {}
     @ObservationIgnored var onHover: (Bool) -> Void = { _ in }
     @ObservationIgnored let meter: MeterState
 
@@ -55,7 +58,8 @@ struct PillGeometry: Equatable {
         // from the same centre.
         let w: CGFloat = longElapsed ? 160 : 136
         let c = NSRect(x: f.midX - w / 2, y: f.maxY - bar, width: w, height: bar)
-        let e = NSRect(x: f.midX - w / 2 - 52, y: f.maxY - bar - rowHeight, width: w + 104, height: bar + rowHeight)
+        // Wide enough for the "Meeting over?" row: label, Keep going and Stop.
+        let e = NSRect(x: f.midX - w / 2 - 76, y: f.maxY - bar - rowHeight, width: w + 152, height: bar + rowHeight)
         return PillGeometry(collapsed: c, expanded: e, bandHeight: bar, contentWidth: w, hasNotch: false)
     }
 }
@@ -127,6 +131,8 @@ final class NotchPillController {
 
     func setExpanded(_ on: Bool) {
         guard let panel, let g = geometry, let model, model.expanded != on else { return }
+        // Hovering away must not hide an unanswered "Meeting over?".
+        if !on, model.endPrompt != nil { return }
         model.expanded = on
         // Reduce Motion: jump to the new size instead of growing.
         guard !Announce.reduceMotion else {
@@ -176,10 +182,25 @@ struct NotchPillView: View {
             }
             if model.expanded {
                 HStack(spacing: 10) {
-                    Text(model.title).font(.system(size: 12, weight: .medium)).foregroundStyle(.white.opacity(0.9))
-                        .lineLimit(1).truncationMode(.tail)
-                        .accessibilityLabel("Meeting: \(model.title)")
-                    Spacer(minLength: 4)
+                    if let reason = model.endPrompt {
+                        Text("Meeting over?").font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
+                            .lineLimit(1).fixedSize()
+                            .help(reason)
+                            .accessibilityLabel("Meeting over? \(reason)")
+                        Spacer(minLength: 4)
+                        Button(action: model.onKeepGoing) {
+                            Text("Keep going").font(.system(size: 11, weight: .semibold))
+                                .padding(.horizontal, 10).padding(.vertical, 3)
+                                .foregroundStyle(.white.opacity(0.85))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Keep recording")
+                    } else {
+                        Text(model.title).font(.system(size: 12, weight: .medium)).foregroundStyle(.white.opacity(0.9))
+                            .lineLimit(1).truncationMode(.tail)
+                            .accessibilityLabel("Meeting: \(model.title)")
+                        Spacer(minLength: 4)
+                    }
                     Button(action: model.onStop) {
                         Label("Stop", systemImage: "stop.fill").labelStyle(.titleAndIcon)
                             .font(.system(size: 11, weight: .semibold))

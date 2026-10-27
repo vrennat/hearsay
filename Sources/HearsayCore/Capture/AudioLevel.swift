@@ -20,6 +20,22 @@ public struct AudioLevel: Sendable, Equatable {
         if level > Self.loudThreshold { lastLoudAt = time }
     }
 
+    /// How long "hearing" / "playing" holds after the last qualifying buffer, so the menu's state word
+    /// does not flip between words and pauses (buffers arrive in bursts; a 0.3 s gap read as quiet).
+    public static let activeHold: Double = 1.5
+
+    /// A loud buffer within `activeHold`: the mic is picking up sound, not just delivering silence.
+    public func isHearing(now: Double) -> Bool {
+        guard let t = lastLoudAt else { return false }
+        return now - t < Self.activeHold
+    }
+
+    /// Any buffer within `activeHold`: for the call tap, which delivers nothing while no app plays.
+    public func isFlowing(now: Double) -> Bool {
+        guard let t = lastBufferAt else { return false }
+        return now - t < Self.activeHold
+    }
+
     /// Reads the floor once buffers stop for 0.3 s.
     public func displayLevel(now: Double) -> Float {
         guard let last = lastBufferAt, now - last < 0.3 else { return Self.floor }

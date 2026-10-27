@@ -3,7 +3,7 @@ import HearsayCore
 import SwiftUI
 
 /// The Live window: live lines with speaker labels (auto-scrolling) and the live speakers. Clicking a
-/// speaker row or a line's label opens a rename popover, which also shows "Sounds like X" hints.
+/// speaker's name field (or a line's label, which focuses that field) renames it live; "Sounds like X" hints sit under the field.
 @MainActor
 final class LiveWindowController {
     static let shared = LiveWindowController()
@@ -40,7 +40,7 @@ final class LiveWindowController {
 
 struct LiveWindowView: View {
     let model: LiveModel
-    @State private var editing: String?
+    @FocusState private var focused: String?
     @State private var search = ""
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -65,31 +65,29 @@ struct LiveWindowView: View {
         return q.isEmpty || line.text.localizedCaseInsensitiveContains(q) || model.label(line.speaker).localizedCaseInsensitiveContains(q)
     }
 
+    /// Names are typed straight into the speaker rows (no popover): a popover in a row that redraws
+    /// with every 2 s live save was easy to lose mid-word. A field saves on Return or when focus leaves.
     private var speakerList: some View {
         List {
             Section("Speakers") {
                 if model.speakers.isEmpty { Label("Nobody yet", systemImage: "person.2.slash").foregroundStyle(.secondary) }
                 ForEach(model.speakers) { s in
-                    Button { editing = s.id } label: {
-                        HStack {
-                            Image(systemName: s.stream == .mic ? "mic" : "phone")
-                                .foregroundStyle(.secondary).frame(width: 16)
-                                .accessibilityLabel(s.stream == .mic ? "In the room" : "On the call")
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(model.label(s.id)).lineLimit(1)
-                                if model.names[s.id] == nil, let h = model.hints[s.id] {
-                                    Text("Sounds like \(h.name)").font(.caption).foregroundStyle(.secondary)
-                                }
+                    HStack(alignment: .firstTextBaseline) {
+                        Image(systemName: s.stream == .mic ? "mic" : "phone")
+                            .foregroundStyle(.secondary).frame(width: 16)
+                            .accessibilityLabel(s.stream == .mic ? "In the room" : "On the call")
+                        VStack(alignment: .leading, spacing: 2) {
+                            SpeakerNameField(model: model, id: s.id, focus: $focused)
+                            if model.names[s.id] == nil, let h = model.hints[s.id] {
+                                Button("Sounds like \(h.name)") { model.rename(s.id, to: h.name) }
+                                    .buttonStyle(.plain).font(.caption).foregroundStyle(.secondary)
+                                    .help("“\(h.quote)”. Click to use this name.")
+                                    .accessibilityLabel("Suggestion: sounds like \(h.name). Use it")
                             }
-                            Spacer()
-                            Text(Self.duration(s.talkSeconds)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                         }
-                        .contentShape(Rectangle())
+                        Spacer(minLength: 4)
+                        Text(Self.duration(s.talkSeconds)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityHint("Name this speaker")
-                    .help("Click to name this speaker")
-                    .popover(isPresented: binding(s.id), arrowEdge: .trailing) { RenamePopover(model: model, id: s.id) { editing = nil } }
                 }
             }
         }
@@ -105,16 +103,13 @@ struct LiveWindowView: View {
                             Text(MenuContent.elapsed(line.start)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                                 .frame(width: 44, alignment: .trailing)
                                 .accessibilityLabel("At \(ElapsedLabel.spoken(line.start))")
-                            Button { editing = "line:\(i)" } label: {
+                            Button { focused = line.speaker } label: {
                                 Text(model.label(line.speaker)).fontWeight(.semibold)
                                     .foregroundStyle(line.stream == .mic ? Color.accentColor : Color.purple)
                             }
                             .buttonStyle(.plain)
                             .accessibilityHint("Name this speaker")
                             .help("Click to name this speaker")
-                            .popover(isPresented: binding("line:\(i)"), arrowEdge: .bottom) {
-                                RenamePopover(model: model, id: line.speaker) { editing = nil }
-                            }
                             Text(line.text).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .id(i)
@@ -146,49 +141,36 @@ struct LiveWindowView: View {
         }
     }
 
-    private func binding(_ key: String) -> Binding<Bool> {
-        Binding(get: { editing == key }, set: { if !$0, editing == key { editing = nil } })
-    }
-
     static func duration(_ s: Double) -> String { MenuContent.elapsed(s) }
 }
 
-struct RenamePopover: View {
+/// One speaker's name, edited in place. Shows the default label (Room 1, Remote 2) as the placeholder;
+/// an emptied field clears the name.
+struct SpeakerNameField: View {
     let model: LiveModel
     let id: String
-    let done: () -> Void
+    var focus: FocusState<String?>.Binding
     @State private var text = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Name \(LiveModel.defaultLabel(id))").font(.headline)
-            TextField("First name", text: $text).textFieldStyle(.roundedBorder).frame(width: 220)
-                .onSubmit(save)
-                .accessibilityLabel("Name for \(LiveModel.defaultLabel(id))")
-            if let h = model.hints[id] {
-                Button { text = h.name } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Sounds like \(h.name)").font(.callout)
-                        Text("“\(h.quote)”").font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                    }
-                }
-                .buttonStyle(.plain)
-                .help("A suggestion from how people addressed this voice. Click to use it.")
-                .accessibilityLabel("Suggestion: sounds like \(h.name)")
-            }
-            HStack {
-                if model.names[id] != nil { Button("Clear") { text = ""; save() } }
-                Spacer()
-                Button("Cancel", action: done).keyboardShortcut(.cancelAction)
-                Button("Save", action: save).keyboardShortcut(.defaultAction)
-            }
-        }
-        .padding(12)
-        .onAppear { text = model.names[id] ?? "" }
+        TextField(LiveModel.defaultLabel(id), text: $text)
+            .textFieldStyle(.plain)
+            .focused(focus, equals: id)
+            .onSubmit(save)
+            .onChange(of: focus.wrappedValue) { old, new in if old == id, new != id { save() } }
+            .onChange(of: model.names[id]) { _, n in if focus.wrappedValue != id { text = n ?? "" } }
+            .onChange(of: text) { _, t in if focus.wrappedValue == id { model.drafts[id] = t } }
+            .onAppear { text = model.names[id] ?? "" }
+            .onDisappear(perform: save)  // closing the window mid-edit keeps what was typed
+            .accessibilityLabel("Name for \(LiveModel.defaultLabel(id))")
+            .help("Type a name, then press Return")
     }
 
     private func save() {
-        model.rename(id, to: text)
-        done()
+        // After Stop the meeting is over; a late save would land in the next meeting's live engines.
+        guard model.isRecording else { return }
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard t != (model.names[id] ?? "") else { return }
+        model.rename(id, to: t)
     }
 }

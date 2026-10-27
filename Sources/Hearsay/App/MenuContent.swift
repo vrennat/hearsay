@@ -594,13 +594,14 @@ struct MenuRecording {
     var micLevel: Float
     var systemLevel: Float
     var warnings: Set<RecordingSession.Warning>
-    var micActive: Bool { micLevel > AudioLevel.floor }
-    var callActive: Bool { systemLevel > AudioLevel.floor }
+    var micActive: Bool
+    var callActive: Bool
 
     @MainActor static func current(_ model: AppModel) -> MenuRecording? {
         if let s = model.session {
             return MenuRecording(title: s.meeting.title, elapsed: s.elapsed, micLevel: s.micLevel,
-                                 systemLevel: s.systemLevel, warnings: s.warnings)
+                                 systemLevel: s.systemLevel, warnings: s.warnings,
+                                 micActive: s.micActive, callActive: s.callActive)
         }
         return MenuPreview.recording
     }

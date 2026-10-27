@@ -22,16 +22,24 @@ final class LiveModel {
     private(set) var hints: [String: NameHints.Hint] = [:]
     private(set) var isRecording = false
     private var candidates: Set<String> = []
+    /// Text typed in a name field and not yet saved (no Return, focus still there). Stop commits it
+    /// before the final live save; the pill never takes focus, so the field would not save itself.
+    var drafts: [String: String] = [:]
 
     func begin(meeting: Meeting, store: MeetingStore) {
         meetingID = meeting.id
-        lines = []; speakers = []; names = [:]; hints = [:]
+        lines = []; speakers = []; names = [:]; hints = [:]; drafts = [:]
         isRecording = true
         // Attendees plus every name typed in any meeting; computed once (it reads every folder).
         candidates = NameHints.candidates(for: meeting, store: store)
     }
 
-    func end() { isRecording = false }
+    /// Commits unsaved drafts, then marks the meeting over. Called before the live engines flush.
+    func end() {
+        for (id, text) in drafts where text.trimmingCharacters(in: .whitespacesAndNewlines) != (names[id] ?? "") { rename(id, to: text) }
+        drafts = [:]
+        isRecording = false
+    }
 
     func update(_ new: [LiveLine]) {
         lines = new
@@ -48,13 +56,24 @@ final class LiveModel {
     func label(_ id: String) -> String { names[id] ?? Self.defaultLabel(id) }
 
     func rename(_ id: String, to name: String) {
+        // After Stop the live engines belong to the finished (then the next) meeting.
+        guard isRecording else { return }
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         names[id] = trimmed.isEmpty ? nil : trimmed
+        drafts[id] = nil
         let log = self.log
-        Task.detached {
+        // Chained so the final flush at Stop (`flushRenames`) runs after every rename reached the transcriber.
+        let previous = pendingRename
+        pendingRename = Task {
+            await previous?.value
             do { try await LiveTranscriber.shared.renameSpeaker(id, to: trimmed) } catch { log.error("Live rename failed: \(error)") }
         }
     }
+
+    private var pendingRename: Task<Void, Never>?
+
+    /// Waits for renames already sent, so they land in this meeting's live.json before it is finished.
+    func flushRenames() async { await pendingRename?.value }
 
     static func slot(_ id: String) -> Int { Int(id.split(separator: "-").last ?? "") ?? 0 }
 
