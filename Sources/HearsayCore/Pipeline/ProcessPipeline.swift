@@ -8,11 +8,14 @@ public struct PipelineEngines: Sendable {
 
     public let transcriber: ParakeetTranscriber
     public let diarizer: SpeakerDiarizer
+    /// The call track's diarizer, tuned (`SpeakerDiarizer.callTuning`).
+    public let callDiarizer: SpeakerDiarizer
     public let embedder: VoiceEmbedder
 
     public init(transcriber: ParakeetTranscriber = ParakeetTranscriber(), diarizer: SpeakerDiarizer = SpeakerDiarizer(),
+                callDiarizer: SpeakerDiarizer = SpeakerDiarizer(tuning: SpeakerDiarizer.callTuning),
                 embedder: VoiceEmbedder = VoiceEmbedder()) {
-        self.transcriber = transcriber; self.diarizer = diarizer; self.embedder = embedder
+        self.transcriber = transcriber; self.diarizer = diarizer; self.callDiarizer = callDiarizer; self.embedder = embedder
     }
 }
 
@@ -193,9 +196,9 @@ public enum ProcessPipeline {
                 // A count you gave for the call gets its own diarizer; the shared one keeps the defaults.
                 let diarizer: SpeakerDiarizer
                 if t.kind == .system, let n = callSpeakers, n > 1 {
-                    var tuning = SpeakerDiarizer.Tuning(); tuning.minSpeakers = n
+                    var tuning = SpeakerDiarizer.callTuning; tuning.minSpeakers = n
                     diarizer = SpeakerDiarizer(tuning: tuning)
-                } else { diarizer = engines.diarizer }
+                } else { diarizer = t.kind == .system ? engines.callDiarizer : engines.diarizer }
                 segments = try await diarizer.diarize(t.samples)
                     .map { DiarSegment(slot: $0.slot, start: $0.start + t.startOffset, end: $0.end + t.startOffset) }
             } catch {
@@ -204,7 +207,10 @@ public enum ProcessPipeline {
                 HSLog("diarizer").error("\(id): diarizing \(t.kind.rawValue) failed, one speaker: \(error)")
             }
             let forced = t.kind == .system && (callSpeakers ?? 0) > 1
-            let built = Attribution.build(words: w, segments: segments, stream: t.kind, foldTiny: !forced)
+            // The tuned call diarizer splits shared feeds but also scatters fragments (36 voices on a
+            // 4-person call, all but 4-5 under 5%): fold every call voice under 5% of the call's words.
+            let built = Attribution.build(words: w, segments: segments, stream: t.kind, foldTiny: !forced,
+                                          foldShare: t.kind == .system && !forced ? Attribution.callFoldShare : nil)
             HSLog("diarizer").info("\(id): \(t.kind.rawValue) \(Int(Double(t.samples.count) / AudioLoader.sampleRate)) s, \(segments.count) segments, \(Set(segments.map(\.slot)).count) diarizer voices, \(built.speakers.count) speakers after folding")
             speakers += built.speakers
             utterances += built.utterances

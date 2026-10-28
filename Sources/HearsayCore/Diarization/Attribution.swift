@@ -35,16 +35,22 @@ public enum Attribution {
     /// other slot: the offline diarizer splits off a few seconds of one voice (a 4 s "Room 2" on a
     /// one-person mic track) far more often than someone speaks only one short phrase.
     public static let minSlotSeconds = 5.0
+    /// Call voices under this share of the call's words fold into a neighbour (see `SpeakerDiarizer.callTuning`).
+    public static let callFoldShare = 0.05
 
     /// `foldTiny` false keeps every slot: a voice you asked for ("People on the call") is not merged away.
     public static func build(words: [Word], segments: [DiarSegment], stream: StreamKind,
-                             foldTiny: Bool = true) -> (speakers: [Speaker], utterances: [Utterance]) {
+                             foldTiny: Bool = true, foldShare: Double? = nil) -> (speakers: [Speaker], utterances: [Utterance]) {
         var slots = words.map { slot(for: $0, in: segments) }
         var wordTime: [String: Double] = [:]
         for (w, s) in zip(words, slots) { wordTime[s, default: 0] += w.end - w.start }
         let total = wordTime.values.reduce(0, +)
-        let tiny = !foldTiny ? Set<String>() : Set(wordTime.filter { $0.value < minSlotSeconds && $0.value < total * SpeakerSummary.mainShare }.keys)
-        let kept = segments.filter { !tiny.contains($0.slot) }
+        let tiny = !foldTiny ? Set<String>() : Set(wordTime.filter {
+            $0.value < total * (foldShare ?? 0) || ($0.value < minSlotSeconds && $0.value < total * SpeakerSummary.mainShare)
+        }.keys)
+        // Only slots that already hold words can take a folded word: a slot with segments but no
+        // words is never "tiny" (it has no word time) and would otherwise revive as a 1 s speaker.
+        let kept = segments.filter { wordTime[$0.slot] != nil && !tiny.contains($0.slot) }
         if !tiny.isEmpty, !kept.isEmpty {
             slots = zip(words, slots).map { w, s in tiny.contains(s) ? slot(for: w, in: kept) : s }
             wordTime = [:]
