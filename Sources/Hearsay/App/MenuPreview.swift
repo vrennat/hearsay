@@ -36,8 +36,8 @@ enum MenuPreview {
                     if model.previewRecordingID != nil {
                         // Sample lines so the live pane and its name fields have something to show.
                         LiveModel.shared.update([
-                            LiveLine(speaker: "mic-1", stream: .mic, start: 2, end: 6, text: "Morning, Reese, can you hear me?"),
-                            LiveLine(speaker: "sys-1", stream: .system, start: 7, end: 12, text: "Loud and clear. Tyler is joining late."),
+                            LiveLine(speaker: "mic-1", stream: .mic, start: 2, end: 6, text: "Morning, Dana, can you hear me?"),
+                            LiveLine(speaker: "sys-1", stream: .system, start: 7, end: 12, text: "Loud and clear. Kim is joining late."),
                             LiveLine(speaker: "sys-2", stream: .system, start: 13, end: 19, text: "Sorry, I'm here now."),
                         ])
                     }

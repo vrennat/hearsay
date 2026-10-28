@@ -57,6 +57,24 @@ final class AttributionTests: XCTestCase {
         XCTAssertEqual(Attribution.build(words: w2, segments: short, stream: .mic).speakers.count, 2)
     }
 
+    func testCallFoldByShareNeverRevivesAWordlessSlot() {
+        // A and B speak; C has a segment but no words; D is a fragment under 5%.
+        let segs = [DiarSegment(slot: "A", start: 0, end: 100), DiarSegment(slot: "B", start: 100, end: 200),
+                    DiarSegment(slot: "C", start: 200, end: 201), DiarSegment(slot: "D", start: 202, end: 205)]
+        var words = stride(from: 0.0, to: 199, by: 0.5).map { Word(text: "w", start: $0, end: $0 + 0.4) }
+        words += stride(from: 202.0, to: 205, by: 0.5).map { Word(text: "w", start: $0, end: $0 + 0.4) }
+        let (speakers, _) = Attribution.build(words: words, segments: segs, stream: .system, foldShare: 0.05)
+        XCTAssertEqual(speakers.count, 2)
+    }
+
+    func testCallFoldWithOnlyFragmentsKeepsTheLargest() {
+        // 25 slots of 4 s each (4% each): none reaches 5%, so the largest holding 80% are kept.
+        let segs = (0..<25).map { DiarSegment(slot: "S\($0)", start: Double($0) * 4, end: Double($0) * 4 + 4) }
+        let words = stride(from: 0.0, to: 100, by: 0.5).map { Word(text: "w", start: $0, end: $0 + 0.4) }
+        let (speakers, _) = Attribution.build(words: words, segments: segs, stream: .system, foldShare: 0.05)
+        XCTAssertEqual(speakers.count, 20)
+    }
+
     func testCleanSpansSkipOverlapAndShortTurns() {
         let u = [
             Utterance(speaker: "mic-1", stream: .mic, start: 0, end: 3, text: "a"),
