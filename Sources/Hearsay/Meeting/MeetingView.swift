@@ -139,7 +139,6 @@ struct MeetingInspector: View {
                     Label("No speakers yet", systemImage: "person.2.slash").foregroundStyle(.secondary)
                 }
                 ForEach(model.speakers) { s in SpeakerRowView(model: model, row: s) }
-                if model.hasCallAudio, model.canReprocess { CallSpeakersRow(model: model) }
                 if let note = model.summaryNote {
                     // Why on-device summaries are missing (model unavailable, still downloading, …).
                     Label(note, systemImage: "sparkles").font(.caption).foregroundStyle(.secondary)
@@ -180,38 +179,6 @@ struct MoveLineMenu: View {
                 Button(s.name ?? s.label) { model.move(line, to: s.id) }
             }
             Button("New Speaker") { model.move(line, to: nil) }
-        }
-    }
-}
-
-/// "People on the call": when diarization merged several remote voices (one Zoom feed from a shared
-/// room often comes out as one Remote), you say how many spoke and the meeting is re-transcribed with
-/// at least that many call voices. Names typed on the old voices may land on other voices afterwards.
-struct CallSpeakersRow: View {
-    let model: MeetingModel
-    @State private var count = 2
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Stepper("People on the call: \(count)", value: $count, in: 2...20)
-                    .font(.caption)
-                    .accessibilityLabel("People who spoke on the call")
-                    .accessibilityValue("\(count)")
-            }
-            HStack {
-                Text("Wrong number of remote voices?").font(.caption2).foregroundStyle(.secondary)
-                Spacer(minLength: 4)
-                Button("Re-split") { model.rediarize(callSpeakers: count) }
-                    .controlSize(.small)
-                    .help("Transcribe this meeting again with at least \(count) voices on the call. Names you typed may need checking afterwards.")
-            }
-        }
-        .padding(8)
-        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
-        .onAppear {
-            let remote = model.speakers.filter { $0.stream == .system }.count
-            count = model.meeting.callSpeakers ?? max(2, remote + 1)
         }
     }
 }

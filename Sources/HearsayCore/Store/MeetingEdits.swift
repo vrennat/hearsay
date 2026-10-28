@@ -77,14 +77,6 @@ public enum MeetingEdits {
         }
     }
 
-    /// How many people spoke on the call (nil: let the diarizer decide). Takes effect when the
-    /// meeting is next processed.
-    public static func setCallSpeakers(id: String, count: Int?, store: MeetingStore) throws {
-        var m = try store.loadMeeting(id)
-        m.callSpeakers = count.flatMap { $0 > 1 ? $0 : nil }
-        try store.saveMeeting(m)
-    }
-
     /// Sets the title the user typed (a placeholder becomes the date-time title), marks it
     /// `titleEditedByUser` so the on-device titler never replaces it, saves, re-renders and reindexes.
     /// The folder name never changes.

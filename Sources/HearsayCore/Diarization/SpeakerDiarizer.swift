@@ -26,6 +26,14 @@ public actor SpeakerDiarizer {
         public init() {}
     }
 
+    /// The call track's settings. Measured on Tanner's real calls (2026-10-28): the defaults put every
+    /// remote voice into one speaker on three calls whose far ends had 2, ~7 and 4 speakers (one feed
+    /// each, the last with 3 people on one room mic); Fa 0.3 / Fb 0.2 split the 2-person call 289 / 238 s
+    /// and the 7-person call into 2, left the room call at 1, and on a 4-person call the defaults
+    /// already got right kept the same 4 largest voices plus fragments that the 5% fold removes.
+    /// Stronger values (0.5/0.1, 0.8/0.05) changed nothing on the merged calls and shattered that one.
+    public static var callTuning: Tuning { var t = Tuning(); t.fa = 0.3; t.fb = 0.2; return t }
+
     public init(tuning: Tuning = Tuning()) {
         var c = OfflineDiarizerConfig.default
         if let v = tuning.threshold { c.clustering.threshold = v }

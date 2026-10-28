@@ -176,23 +176,6 @@ final class MeetingModel {
         reload()
     }
 
-    var hasCallAudio: Bool { meeting.streams.contains { $0.kind == .system } }
-
-    /// Saves how many people spoke on the call and re-transcribes with at least that many call voices.
-    func rediarize(callSpeakers n: Int) {
-        guard canReprocess else { return }
-        do {
-            try MeetingEdits.setCallSpeakers(id: id, count: n, store: store)
-            editError = nil
-            log.info("\(id): call speakers set to \(n)")
-        } catch {
-            editError = "Could not save the speaker count: \(error)"
-            return
-        }
-        reload()
-        reprocess()
-    }
-
     func reprocess() {
         guard canReprocess else { return }
         player?.pause()
