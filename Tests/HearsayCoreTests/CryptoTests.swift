@@ -81,6 +81,20 @@ final class AudioEncryptionTests: XCTestCase {
         return store.folder(id).appendingPathComponent("audio/\(file)")
     }
 
+    func testExportWritesDecryptedAudioAndLeavesTheMeeting() throws {
+        let store = MeetingStore(root: try TestSupport.tempRoot())
+        let id = "2026-10-22 0905 X"
+        let caf = try meeting(store, id, file: "mic.caf")
+        try tone(caf)
+        let original = try Data(contentsOf: caf)
+        try AudioVault.encryptMeeting(id, store: store)
+        let dest = try TestSupport.tempRoot().appendingPathComponent("out")
+        let files = try AudioVault.export(id, store: store, to: dest)
+        XCTAssertEqual(files.map(\.lastPathComponent), ["mic.caf"])
+        XCTAssertEqual(try Data(contentsOf: files[0]), original)
+        XCTAssertEqual(try store.loadMeeting(id).streams.map(\.file), ["audio/mic.caf.enc"])
+    }
+
     func testEncryptedCAFDecodesLikePlainAndDecryptsBack() throws {
         let store = MeetingStore(root: try TestSupport.tempRoot())
         let id = "2026-10-22 0900 E"
