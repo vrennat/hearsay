@@ -39,6 +39,33 @@ enum Updater {
         #endif
     }
 
+    /// Sparkle's own daily check, stored by Sparkle in this app's defaults (`SUEnableAutomaticChecks`).
+    /// Off: nothing is checked until you choose Check for Updates.
+    static var automaticallyChecks: Bool {
+        get {
+            #if HEARSAY_NO_SPARKLE
+            return false
+            #else
+            return controller?.updater.automaticallyChecksForUpdates ?? false
+            #endif
+        }
+        set {
+            #if !HEARSAY_NO_SPARKLE
+            controller?.updater.automaticallyChecksForUpdates = newValue
+            log.info("Automatic update checks \(newValue ? "on" : "off")")
+            #endif
+        }
+    }
+
+    /// Whether Sparkle is running in this process (the toggle needs it).
+    static var isRunning: Bool {
+        #if HEARSAY_NO_SPARKLE
+        return false
+        #else
+        return controller != nil
+        #endif
+    }
+
     static func checkForUpdates() {
         #if !HEARSAY_NO_SPARKLE
         guard let controller else { return }

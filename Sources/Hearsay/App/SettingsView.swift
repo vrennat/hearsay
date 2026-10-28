@@ -57,6 +57,7 @@ struct GeneralPane: View {
     @AppStorage(Prefs.menuStyle, store: Prefs.defaults) private var menuStyle = MenuStyle.panel.rawValue
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var loginError: String?
+    @State private var autoUpdate = false
     private var model: AppModel { AppModel.shared }
 
     var body: some View {
@@ -116,6 +117,16 @@ struct GeneralPane: View {
             Section {
                 LabeledContent("Version", value: HearsayCore.version)
                     .help("Hearsay \(HearsayCore.version)")
+                if Updater.isRunning {
+                    Toggle(isOn: Binding(get: { autoUpdate }, set: { autoUpdate = $0; Updater.automaticallyChecks = $0 })) {
+                        Text("Check for updates automatically")
+                        Text("Once a day; you are asked before anything installs.")
+                    }
+                    .onAppear { autoUpdate = Updater.automaticallyChecks }
+                    LabeledContent("Updates") {
+                        Button("Check Now") { Updater.checkForUpdates() }
+                    }
+                }
             }
         }
         .settingsPane()

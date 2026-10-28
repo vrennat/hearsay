@@ -51,10 +51,22 @@ public actor LiveTranscriber {
     private var dirty = false
     private var onLines: (@Sendable ([LiveLine]) -> Void)?
 
+    /// LS-EEND model per stream: `ami` (meeting rooms), `callhome` (telephone), `dihard2`, `dihard3`.
+    /// The call uses dihard3: on synthetic Zoom-like call tracks (Opus 20-24 kbps) it found 3 of 4
+    /// voices where ami found 2 (similar voices, reverb, noise), split 4 distinct voices 62/32/32 s
+    /// where ami gave 62/61/3, and matched ami on two voices. The room keeps ami (meeting-room audio).
+    public var diarizerVariant: [StreamKind: String] = [.system: "dihard3"]
+
     public init(echoMatcher: @escaping LiveEchoMatcher = LiveEcho.match,
                 now: @escaping @Sendable () -> Date = { Date() }) {
         self.echoMatcher = echoMatcher
         self.now = now
+    }
+
+    public func setDiarizerVariant(_ name: String, for kind: StreamKind) { diarizerVariant[kind] = name }
+
+    static func variant(_ name: String?) -> ModelNames.LSEEND.Variant {
+        switch name { case "callhome": .callhome; case "dihard2": .dihard2; case "dihard3": .dihard3; default: .ami }
     }
 
     // MARK: Session
@@ -213,7 +225,9 @@ public actor LiveTranscriber {
             let asr = StreamingUnifiedAsrManager(config: UnifiedConfig(leftFrames: 70, chunkFrames: 7, rightFrames: 7))
             try await asr.loadModels()
             let diarizer = LSEENDDiarizer()
-            try await diarizer.initialize(variant: .ami, stepSize: .step100ms, computeUnits: .cpuOnly)
+            let v = Self.variant(await self.diarizerVariant[kind])
+            try await diarizer.initialize(variant: v, stepSize: .step100ms, computeUnits: .cpuOnly)
+            HSLog("live").info("Live diarizer for \(kind.rawValue): LS-EEND \(v)")
             Self.log.info("Live engines for \(kind.rawValue, privacy: .public) loaded in \(Date().timeIntervalSince(start))s")
             return Engines(asr: asr, diarizer: diarizer)
         }
