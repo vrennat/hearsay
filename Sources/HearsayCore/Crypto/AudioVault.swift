@@ -11,6 +11,45 @@ public enum AudioVault {
         try convert(id, store: store, encrypt: true)
     }
 
+    /// Writes each stream of a meeting to `dest`, decrypted (`.enc` dropped from the name), leaving the
+    /// meeting untouched. `hearsay export --audio`. Returns the files written.
+    public static func export(_ id: String, store: MeetingStore, to dest: URL) throws -> [URL] {
+        let m = try store.loadMeeting(id)
+        if m.audioRemovedAt != nil { throw ExportError.audioRemoved }
+        try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+        var written: [URL] = []
+        // All or nothing: a stream that fails removes the plaintext copies already written.
+        do { try export(m, store: store, to: dest, written: &written) } catch {
+            for f in written { try? FileManager.default.removeItem(at: f) }
+            throw error
+        }
+        return written
+    }
+
+    public enum ExportError: Error, CustomStringConvertible {
+        case audioRemoved, missing(String)
+        public var description: String {
+            switch self {
+            case .audioRemoved: "This meeting's audio was removed by retention."
+            case .missing(let f): "Audio file missing: \(f)"
+            }
+        }
+    }
+
+    private static func export(_ m: Meeting, store: MeetingStore, to dest: URL, written: inout [URL]) throws {
+        let id = m.id
+        for s in m.streams {
+            let src = store.folder(id).appendingPathComponent(s.file)
+            guard FileManager.default.fileExists(atPath: src.path) else { throw ExportError.missing(s.file) }
+            let isEnc = src.pathExtension == "enc"
+            let target = dest.appendingPathComponent(isEnc ? src.deletingPathExtension().lastPathComponent : src.lastPathComponent)
+            try? FileManager.default.removeItem(at: target)
+            if isEnc { try EncryptedFile.decryptFile(src, to: target, key: AudioKey.existing()) }
+            else { try FileManager.default.copyItem(at: src, to: target) }
+            written.append(target)
+        }
+    }
+
     /// Decrypts every `.enc` stream back to its plain file (Settings: recordings encryption off).
     @discardableResult
     public static func decryptMeeting(_ id: String, store: MeetingStore) throws -> Int {
