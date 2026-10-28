@@ -1,6 +1,7 @@
 import AppKit
 import HearsayCore
 import Observation
+import SwiftUI
 
 /// State of the main "Hearsay" window: every meeting in the store, the sidebar search and selection,
 /// and the `MeetingModel` of the selected meeting (the detail pane is the old meeting window's view).
@@ -13,6 +14,9 @@ final class MainWindowModel {
     var search = ""
     var selection: String? { didSet { if selection != oldValue { selectionChanged() } } }
     private(set) var detail: MeetingModel?
+    /// Sidebar shown or hidden. Opening the window with nothing selected shows it again: without
+    /// it the window is an empty "No Meeting Selected" pane (Tanner).
+    var columns: NavigationSplitViewVisibility = .all
     /// The meeting a Delete to Trash confirmation is showing for.
     var pendingDelete: Meeting?
     /// `--preview-main` only: a seeded `recording` meeting stands in for a live session.

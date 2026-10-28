@@ -10,10 +10,12 @@ final class MainWindowController: NSObject, NSWindowDelegate {
     static let shared = MainWindowController()
     private(set) var window: NSWindow?
 
+    /// `revealSidebar`: show the sidebar if nothing is selected (every plain open of the window).
     @discardableResult
-    func show() -> NSWindow {
+    func show(revealSidebar: Bool = true) -> NSWindow {
         let w = window ?? make()
         MainWindowModel.shared.refresh()
+        if revealSidebar, MainWindowModel.shared.selection == nil { MainWindowModel.shared.columns = .all }
         AppWindows.willShow()
         NSApp.activate()
         w.makeKeyAndOrderFront(nil)
@@ -24,7 +26,7 @@ final class MainWindowController: NSObject, NSWindowDelegate {
     /// `MeetingOpener`'s route: select the meeting in the sidebar and bring the window front.
     @discardableResult
     func show(_ meeting: Meeting) -> NSWindow {
-        let w = show()
+        let w = show(revealSidebar: false)  // a chosen meeting fills the window; keep the sidebar as it was
         MainWindowModel.shared.select(meeting.id)
         return w
     }
@@ -80,7 +82,7 @@ struct MainWindowView: View {
     @Bindable var model: MainWindowModel
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $model.columns) {
             MeetingSidebar(model: model)
                 .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 360)
         } detail: {
