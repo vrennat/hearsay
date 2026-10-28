@@ -158,6 +158,7 @@ final class MeetingModel {
 
     /// Saves how many people spoke on the call and re-transcribes with at least that many call voices.
     func rediarize(callSpeakers n: Int) {
+        guard canReprocess else { return }
         do {
             try MeetingEdits.setCallSpeakers(id: id, count: n, store: store)
             editError = nil

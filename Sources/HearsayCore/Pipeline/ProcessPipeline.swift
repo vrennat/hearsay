@@ -203,7 +203,8 @@ public enum ProcessPipeline {
                 // thing to check when a call comes out as one speaker.
                 HSLog("diarizer").error("\(id): diarizing \(t.kind.rawValue) failed, one speaker: \(error)")
             }
-            let built = Attribution.build(words: w, segments: segments, stream: t.kind)
+            let forced = t.kind == .system && (callSpeakers ?? 0) > 1
+            let built = Attribution.build(words: w, segments: segments, stream: t.kind, foldTiny: !forced)
             HSLog("diarizer").info("\(id): \(t.kind.rawValue) \(Int(Double(t.samples.count) / AudioLoader.sampleRate)) s, \(segments.count) segments, \(Set(segments.map(\.slot)).count) diarizer voices, \(built.speakers.count) speakers after folding")
             speakers += built.speakers
             utterances += built.utterances
