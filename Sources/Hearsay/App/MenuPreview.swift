@@ -41,6 +41,8 @@ enum MenuPreview {
                             LiveLine(speaker: "sys-2", stream: .system, start: 13, end: 19, text: "Sorry, I'm here now."),
                         ])
                     }
+                    // `--preview-main-hidden-sidebar`: as if the sidebar was closed last time.
+                    if args.contains("--preview-main-hidden-sidebar") { model.columns = .detailOnly }
                     let w = MainWindowController.shared.show()
                     if let width = value("--preview-main-width").flatMap(Double.init) {
                         w.setContentSize(NSSize(width: width, height: w.contentRect(forFrameRect: w.frame).height))
