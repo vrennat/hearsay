@@ -82,6 +82,7 @@ struct LiveSim: AsyncParsableCommand {
     @Argument(help: "Mic stream audio file.") var audio: String
     @Option(help: "System stream audio file.") var second: String?
     @Option(help: "Playback speed (1 = real time, 0 = as fast as possible).") var speed: Double = 1
+    @Option(help: "LS-EEND model for the system stream: ami, callhome, dihard2, dihard3.") var variant: String?
     @OptionGroup var root: RootOption
 
     mutating func run() async throws {
@@ -95,6 +96,7 @@ struct LiveSim: AsyncParsableCommand {
         try store.saveMeeting(Meeting(id: id, title: "live-sim", startedAt: started, status: .recorded))
 
         let live = LiveTranscriber()
+        if let variant { await live.setDiarizerVariant(variant, for: .system) }
         let loadStart = Date()
         try await live.preload()
         print(String(format: "engines ready in %.2fs", Date().timeIntervalSince(loadStart)))

@@ -57,6 +57,7 @@ struct GeneralPane: View {
     @AppStorage(Prefs.menuStyle, store: Prefs.defaults) private var menuStyle = MenuStyle.panel.rawValue
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var loginError: String?
+    @State private var autoUpdate = false
     private var model: AppModel { AppModel.shared }
 
     var body: some View {
@@ -116,6 +117,18 @@ struct GeneralPane: View {
             Section {
                 LabeledContent("Version", value: HearsayCore.version)
                     .help("Hearsay \(HearsayCore.version)")
+                if Updater.isRunning {
+                    // Read Sparkle's own value each time: its first-run prompt can change it while this is open.
+                    Toggle(isOn: Binding(get: { _ = autoUpdate; return Updater.automaticallyChecks },
+                                         set: { Updater.automaticallyChecks = $0; autoUpdate = $0 })) {
+                        Text("Check for updates automatically")
+                        Text("Once a day; you are asked before anything installs.")
+                    }
+                    .onAppear { autoUpdate = Updater.automaticallyChecks }
+                    LabeledContent("Updates") {
+                        Button("Check Now") { Updater.checkForUpdates() }
+                    }
+                }
             }
         }
         .settingsPane()
