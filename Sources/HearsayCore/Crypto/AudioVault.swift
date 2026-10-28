@@ -11,6 +11,21 @@ public enum AudioVault {
         try convert(id, store: store, encrypt: true)
     }
 
+    /// Writes each stream of a meeting to `dest`, decrypted (`.enc` dropped from the name), leaving the
+    /// meeting untouched. `hearsay export --audio`. Returns the files written.
+    public static func export(_ id: String, store: MeetingStore, to dest: URL) throws -> [URL] {
+        try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+        return try store.loadMeeting(id).streams.map { s in
+            let src = store.folder(id).appendingPathComponent(s.file)
+            let isEnc = src.pathExtension == "enc"
+            let target = dest.appendingPathComponent(isEnc ? src.deletingPathExtension().lastPathComponent : src.lastPathComponent)
+            try? FileManager.default.removeItem(at: target)
+            if isEnc { try EncryptedFile.decryptFile(src, to: target, key: AudioKey.existing()) }
+            else { try FileManager.default.copyItem(at: src, to: target) }
+            return target
+        }
+    }
+
     /// Decrypts every `.enc` stream back to its plain file (Settings: recordings encryption off).
     @discardableResult
     public static func decryptMeeting(_ id: String, store: MeetingStore) throws -> Int {

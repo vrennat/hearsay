@@ -142,6 +142,28 @@ final class MeetingModel {
         reload()
     }
 
+    /// Lines from the final transcript (not the live fallback) can be moved to another speaker.
+    var canReassign: Bool { lines.source == .transcript || lines.source == .cleanedTranscript }
+
+    /// Speakers a line could move to: the other voices on its side (room or call).
+    func moveTargets(for line: TranscriptLines.Line) -> [SpeakerRow] {
+        guard let stream = speakers.first(where: { $0.id == line.speaker })?.stream else { return [] }
+        return speakers.filter { $0.stream == stream && $0.id != line.speaker }
+    }
+
+    /// Moves one line to `target`, or to a new speaker when nil.
+    func move(_ line: TranscriptLines.Line, to target: String?) {
+        do {
+            let dest = try MeetingEdits.reassign(id: id, utterances: [line.id], to: target, store: store)
+            editError = nil
+            log.info("Moved line \(line.id) in \(id) to \(dest)")
+        } catch {
+            editError = "Could not move the line: \(error)"
+            log.error("Move line \(line.id) in \(id): \(error)")
+        }
+        reload()
+    }
+
     func rename(_ speaker: String, to name: String) {
         do {
             try MeetingEdits.rename(id: id, speaker: speaker, name: name, store: store)
