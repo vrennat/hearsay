@@ -118,7 +118,9 @@ struct GeneralPane: View {
                 LabeledContent("Version", value: HearsayCore.version)
                     .help("Hearsay \(HearsayCore.version)")
                 if Updater.isRunning {
-                    Toggle(isOn: Binding(get: { autoUpdate }, set: { autoUpdate = $0; Updater.automaticallyChecks = $0 })) {
+                    // Read Sparkle's own value each time: its first-run prompt can change it while this is open.
+                    Toggle(isOn: Binding(get: { _ = autoUpdate; return Updater.automaticallyChecks },
+                                         set: { Updater.automaticallyChecks = $0; autoUpdate = $0 })) {
                         Text("Check for updates automatically")
                         Text("Once a day; you are asked before anything installs.")
                     }

@@ -225,8 +225,16 @@ public actor LiveTranscriber {
             let asr = StreamingUnifiedAsrManager(config: UnifiedConfig(leftFrames: 70, chunkFrames: 7, rightFrames: 7))
             try await asr.loadModels()
             let diarizer = LSEENDDiarizer()
-            let v = Self.variant(await self.diarizerVariant[kind])
-            try await diarizer.initialize(variant: v, stepSize: .step100ms, computeUnits: .cpuOnly)
+            var v = Self.variant(await self.diarizerVariant[kind])
+            do {
+                try await diarizer.initialize(variant: v, stepSize: .step100ms, computeUnits: .cpuOnly)
+            } catch where v != .ami {
+                // A model that fails to download must not cost the live transcript: fall back to ami,
+                // which earlier releases already downloaded, instead of retrying on every chunk.
+                HSLog("live").error("Live diarizer \(v) for \(kind.rawValue) failed (\(error)); using ami")
+                v = .ami
+                try await diarizer.initialize(variant: v, stepSize: .step100ms, computeUnits: .cpuOnly)
+            }
             HSLog("live").info("Live diarizer for \(kind.rawValue): LS-EEND \(v)")
             Self.log.info("Live engines for \(kind.rawValue, privacy: .public) loaded in \(Date().timeIntervalSince(start))s")
             return Engines(asr: asr, diarizer: diarizer)
