@@ -38,21 +38,28 @@ public enum Attribution {
     /// Call voices under this share of the call's words fold into a neighbour (see `SpeakerDiarizer.callTuning`).
     public static let callFoldShare = 0.05
 
-    /// `foldTiny` false keeps every slot: a voice you asked for ("People on the call") is not merged away.
+    /// `foldShare`: also fold any slot under this share of the stream's words (the call track).
     public static func build(words: [Word], segments: [DiarSegment], stream: StreamKind,
-                             foldTiny: Bool = true, foldShare: Double? = nil) -> (speakers: [Speaker], utterances: [Utterance]) {
+                             foldShare: Double? = nil) -> (speakers: [Speaker], utterances: [Utterance]) {
         var slots = words.map { slot(for: $0, in: segments) }
         var wordTime: [String: Double] = [:]
         for (w, s) in zip(words, slots) { wordTime[s, default: 0] += w.end - w.start }
         let total = wordTime.values.reduce(0, +)
-        let tiny = !foldTiny ? Set<String>() : Set(wordTime.filter {
+        let tiny = Set(wordTime.filter {
             $0.value < total * (foldShare ?? 0) || ($0.value < minSlotSeconds && $0.value < total * SpeakerSummary.mainShare)
         }.keys)
         // Only slots that already hold words can take a folded word: a slot with segments but no
         // words is never "tiny" (it has no word time) and would otherwise revive as a 1 s speaker.
-        let kept = segments.filter { wordTime[$0.slot] != nil && !tiny.contains($0.slot) }
+        var keepSlots = Set(wordTime.keys).subtracting(tiny)
+        // Every slot under the share (20+ even fragments): keep the largest slots that together hold
+        // 80% of the words, rather than skipping the fold and keeping every fragment.
+        if keepSlots.isEmpty, foldShare != nil {
+            var sum = 0.0
+            for (slot, t) in wordTime.sorted(by: { $0.value > $1.value }) where sum < total * 0.8 { keepSlots.insert(slot); sum += t }
+        }
+        let kept = segments.filter { keepSlots.contains($0.slot) }
         if !tiny.isEmpty, !kept.isEmpty {
-            slots = zip(words, slots).map { w, s in tiny.contains(s) ? slot(for: w, in: kept) : s }
+            slots = zip(words, slots).map { w, s in keepSlots.contains(s) ? s : slot(for: w, in: kept) }
             wordTime = [:]
             for (w, s) in zip(words, slots) { wordTime[s, default: 0] += w.end - w.start }
         }

@@ -67,6 +67,14 @@ final class AttributionTests: XCTestCase {
         XCTAssertEqual(speakers.count, 2)
     }
 
+    func testCallFoldWithOnlyFragmentsKeepsTheLargest() {
+        // 25 slots of 4 s each (4% each): none reaches 5%, so the largest holding 80% are kept.
+        let segs = (0..<25).map { DiarSegment(slot: "S\($0)", start: Double($0) * 4, end: Double($0) * 4 + 4) }
+        let words = stride(from: 0.0, to: 100, by: 0.5).map { Word(text: "w", start: $0, end: $0 + 0.4) }
+        let (speakers, _) = Attribution.build(words: words, segments: segs, stream: .system, foldShare: 0.05)
+        XCTAssertEqual(speakers.count, 20)
+    }
+
     func testCleanSpansSkipOverlapAndShortTurns() {
         let u = [
             Utterance(speaker: "mic-1", stream: .mic, start: 0, end: 3, text: "a"),

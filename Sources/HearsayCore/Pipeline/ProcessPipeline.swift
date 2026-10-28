@@ -113,8 +113,7 @@ public enum ProcessPipeline {
             let tracks = try Track.load(meeting, store: store)
             guard !tracks.isEmpty else { throw NothingUsable.noAudio }
             let heard = heardStreams((try? store.loadLive(id)) ?? nil)
-            var transcript = try await transcribe(meeting.id, tracks: tracks, engines: options.engines, heard: heard,
-                                                  callSpeakers: meeting.callSpeakers)
+            var transcript = try await transcribe(meeting.id, tracks: tracks, engines: options.engines, heard: heard)
             guard !transcript.utterances.isEmpty else { throw NothingUsable.noSpeech }
             transcript = Glossary.load(root: store.root).apply(to: transcript)
             try await SpeakerIdentity.embed(&transcript, tracks: tracks, embedder: options.engines.embedder)
@@ -162,8 +161,7 @@ public enum ProcessPipeline {
         Set((live?.lines ?? []).filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.map(\.stream))
     }
 
-    static func transcribe(_ id: String, tracks: [Track], engines: PipelineEngines, heard: Set<StreamKind> = [],
-                           callSpeakers: Int? = nil) async throws -> Transcript {
+    static func transcribe(_ id: String, tracks: [Track], engines: PipelineEngines, heard: Set<StreamKind> = []) async throws -> Transcript {
         var words: [StreamKind: [Word]] = [:]
         var curves: [StreamKind: [Float]] = [:]
         for t in tracks {
@@ -193,12 +191,7 @@ public enum ProcessPipeline {
             guard let w = words[t.kind], !w.isEmpty else { continue }
             var segments: [DiarSegment] = []
             do {
-                // A count you gave for the call gets its own diarizer; the shared one keeps the defaults.
-                let diarizer: SpeakerDiarizer
-                if t.kind == .system, let n = callSpeakers, n > 1 {
-                    var tuning = SpeakerDiarizer.callTuning; tuning.minSpeakers = n
-                    diarizer = SpeakerDiarizer(tuning: tuning)
-                } else { diarizer = t.kind == .system ? engines.callDiarizer : engines.diarizer }
+                let diarizer = t.kind == .system ? engines.callDiarizer : engines.diarizer
                 segments = try await diarizer.diarize(t.samples)
                     .map { DiarSegment(slot: $0.slot, start: $0.start + t.startOffset, end: $0.end + t.startOffset) }
             } catch {
@@ -206,11 +199,9 @@ public enum ProcessPipeline {
                 // thing to check when a call comes out as one speaker.
                 HSLog("diarizer").error("\(id): diarizing \(t.kind.rawValue) failed, one speaker: \(error)")
             }
-            let forced = t.kind == .system && (callSpeakers ?? 0) > 1
             // The tuned call diarizer splits shared feeds but also scatters fragments (36 voices on a
             // 4-person call, all but 4-5 under 5%): fold every call voice under 5% of the call's words.
-            let built = Attribution.build(words: w, segments: segments, stream: t.kind, foldTiny: !forced,
-                                          foldShare: t.kind == .system && !forced ? Attribution.callFoldShare : nil)
+            let built = Attribution.build(words: w, segments: segments, stream: t.kind, foldShare: t.kind == .system ? Attribution.callFoldShare : nil)
             HSLog("diarizer").info("\(id): \(t.kind.rawValue) \(Int(Double(t.samples.count) / AudioLoader.sampleRate)) s, \(segments.count) segments, \(Set(segments.map(\.slot)).count) diarizer voices, \(built.speakers.count) speakers after folding")
             speakers += built.speakers
             utterances += built.utterances
@@ -239,8 +230,13 @@ public enum ProcessPipeline {
         let newSys = new.speakers.filter { $0.stream == .system }.count
         let newMic = new.speakers.filter { $0.stream == .mic }.count
         let oldMic = old.speakers.filter { $0.stream == .mic }.count
-        guard newSys < oldSys, newMic > oldMic else { return }
         let named = names.keys.filter { $0.hasPrefix("sys-") || $0.hasPrefix("mic-") }.sorted().joined(separator: ", ")
-        log.warning("\(id, privacy: .public): reprocessing moved voices from sys-* (\(oldSys) -> \(newSys)) to mic-* (\(oldMic) -> \(newMic)); names typed for old ids may now be on other voices: \(named, privacy: .public)")
+        if newSys < oldSys, newMic > oldMic {
+            log.warning("\(id, privacy: .public): reprocessing moved voices from sys-* (\(oldSys) -> \(newSys)) to mic-* (\(oldMic) -> \(newMic)); names typed for old ids may now be on other voices: \(named, privacy: .public)")
+        } else if newSys != oldSys, names.keys.contains(where: { $0.hasPrefix("sys-") }) {
+            // 0.1.6's call tuning often turns one old Remote into several: a name typed on the old
+            // sys-1 (the whole far end) now sits on the new sys-1 only.
+            HSLog("pipeline").info("\(id): reprocessing changed the call voices \(oldSys) -> \(newSys); names typed for old ids may now be on other voices: \(named)")
+        }
     }
 }
