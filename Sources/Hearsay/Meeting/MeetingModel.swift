@@ -143,7 +143,7 @@ final class MeetingModel {
     }
 
     /// Lines from the final transcript (not the live fallback) can be moved to another speaker.
-    var canReassign: Bool { lines.source == .transcript || lines.source == .cleanedTranscript }
+    var canReassign: Bool { (lines.source == .transcript || lines.source == .cleanedTranscript) && !isQueued && !isRecording }
 
     /// Speakers a line could move to: the other voices on its side (room or call).
     func moveTargets(for line: TranscriptLines.Line) -> [SpeakerRow] {

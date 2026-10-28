@@ -52,4 +52,21 @@ final class ReassignTests: XCTestCase {
         XCTAssertThrowsError(try MeetingEdits.reassign(id: id, utterances: [0, 3], to: nil, store: store))
         XCTAssertThrowsError(try MeetingEdits.reassign(id: id, utterances: [99], to: nil, store: store))
     }
+
+    func testRefusedWhileTheMeetingIsBeingProcessed() throws {
+        let (store, id, _) = try make()
+        let lock = MeetingLock()
+        XCTAssertTrue(lock.tryAcquire(id))
+        XCTAssertThrowsError(try MeetingEdits.reassign(id: id, utterances: [1], to: nil, store: store, lock: lock))
+        XCTAssertEqual(try store.loadTranscript(id)?.utterances[1].speaker, "sys-1")
+        lock.release(id)
+    }
+
+    func testNewSpeakerDoesNotInheritALeftoverName() throws {
+        let (store, id, _) = try make()
+        var m = try store.loadMeeting(id); m.speakerNames["sys-3"] = "Ghost"; try store.saveMeeting(m)
+        let dest = try MeetingEdits.reassign(id: id, utterances: [1], to: nil, store: store)
+        XCTAssertEqual(dest, "sys-3")
+        XCTAssertNil(try store.loadMeeting(id).speakerNames["sys-3"])
+    }
 }

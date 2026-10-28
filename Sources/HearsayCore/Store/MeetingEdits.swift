@@ -21,7 +21,12 @@ public enum MeetingEdits {
     /// `voices` gives it one; reprocessing also redoes the split and drops these moves).
     /// Returns the speaker the lines now belong to.
     @discardableResult
-    public static func reassign(id: String, utterances indices: [Int], to target: String?, store: MeetingStore) throws -> String {
+    public static func reassign(id: String, utterances indices: [Int], to target: String?, store: MeetingStore,
+                                lock: MeetingLock = .shared) throws -> String {
+        // The pipeline holds this lock while it re-transcribes; a move then would write the old
+        // transcript back over the new one.
+        guard lock.tryAcquire(id) else { throw EditError.busy }
+        defer { lock.release(id) }
         guard var t = try store.loadTranscript(id) else { throw EditError.noTranscript }
         var m = try store.loadMeeting(id)
         let valid = indices.filter { t.utterances.indices.contains($0) }
@@ -36,13 +41,17 @@ public enum MeetingEdits {
             let prefix = stream == .mic ? "mic" : "sys"
             let n = (t.speakers.filter { $0.stream == stream }.compactMap { Int($0.id.split(separator: "-").last ?? "") }.max() ?? 0) + 1
             dest = "\(prefix)-\(n)"
+            // A brand-new voice starts with no name, whatever an earlier run left under this id.
+            m.speakerNames[dest] = nil
+            m.inferredSpeakers?.removeAll { $0 == dest }
+            m.confirmedSpeakers.removeAll { $0 == dest }
             t.speakers.append(Speaker(id: dest, stream: stream, defaultLabel: Attribution.defaultLabel(stream: stream, number: n), talkSeconds: 0))
         }
         for i in valid { t.utterances[i].speaker = dest }
         var talk: [String: Double] = [:]
         for u in t.utterances { talk[u.speaker, default: 0] += u.end - u.start }
         t.speakers = t.speakers.compactMap { s in
-            guard let secs = talk[s.id], secs > 0 else { return nil }
+            guard let secs = talk[s.id] else { return nil }  // still has lines, even zero-length ones
             var s = s; s.talkSeconds = secs; return s
         }
         let kept = Set(t.speakers.map(\.id))
@@ -56,9 +65,10 @@ public enum MeetingEdits {
     }
 
     public enum EditError: Error, CustomStringConvertible {
-        case noTranscript, noSuchLine, mixedStreams, wrongStream
+        case noTranscript, noSuchLine, mixedStreams, wrongStream, busy
         public var description: String {
             switch self {
+            case .busy: "This meeting is being transcribed. Try again when it finishes."
             case .noTranscript: "This meeting has no transcript yet."
             case .noSuchLine: "That line no longer exists."
             case .mixedStreams: "Room and call lines cannot be moved together."
