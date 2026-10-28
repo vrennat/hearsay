@@ -55,7 +55,7 @@ public enum Attribution {
         // 80% of the words, rather than skipping the fold and keeping every fragment.
         if keepSlots.isEmpty, foldShare != nil {
             var sum = 0.0
-            for (slot, t) in wordTime.sorted(by: { $0.value > $1.value }) where sum < total * 0.8 { keepSlots.insert(slot); sum += t }
+            for (slot, t) in wordTime.sorted(by: { $0.value > $1.value || ($0.value == $1.value && $0.key < $1.key) }) where sum < total * 0.8 { keepSlots.insert(slot); sum += t }
         }
         let kept = segments.filter { keepSlots.contains($0.slot) }
         if !tiny.isEmpty, !kept.isEmpty {
