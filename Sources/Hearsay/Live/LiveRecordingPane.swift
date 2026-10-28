@@ -11,7 +11,7 @@ struct LiveRecordingPane: View {
     @FocusState private var focused: String?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    @State private var width: CGFloat = 1000
+    @State private var width: CGFloat = 0
 
     var body: some View {
         // Narrow: speakers go under the lines instead of forcing the window wider.

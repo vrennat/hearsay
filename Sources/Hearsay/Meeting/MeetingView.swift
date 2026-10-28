@@ -10,7 +10,7 @@ struct MeetingView: View {
     @AppStorage("meetingInspectorShown") private var inspectorShown = true
     /// The pane's width. Below `inspectorFits` the inspector steps aside instead of forcing the split
     /// view wider, which shoved the sidebar off the window's edge when a meeting was selected.
-    @State private var paneWidth: CGFloat = 1000
+    @State private var paneWidth: CGFloat = 0  // inspector waits for the first measurement rather than overflowing
     static let minTranscript: CGFloat = 320
     private var inspectorFits: Bool { paneWidth >= Self.minTranscript + 240 + 1 }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
