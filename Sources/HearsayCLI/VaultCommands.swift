@@ -55,13 +55,18 @@ struct UnlockCommand: ParsableCommand {
 
 struct ExportCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
-        commandName: "export", abstract: "Write one meeting's transcripts, decrypted, to a folder.")
+        commandName: "export", abstract: "Write one meeting's transcripts (and with --audio its recordings), decrypted, to a folder.")
     @Argument(help: "Meeting id (folder name).") var id: String
     @Option(help: "Destination folder (default: the current folder).") var to: String = "."
+    @Flag(help: "Also write the audio streams, decrypted, to <folder>/<id>/audio/ (for sharing a meeting to debug it).") var audio = false
     @OptionGroup var root: RootOption
 
     mutating func run() throws {
         let dir = URL(fileURLWithPath: (to as NSString).expandingTildeInPath, isDirectory: true)
-        print(try TranscriptVault.export(store: root.store, id: id, to: dir).path)
+        let out = try TranscriptVault.export(store: root.store, id: id, to: dir)
+        if audio {
+            for f in try AudioVault.export(id, store: root.store, to: out.appendingPathComponent("audio", isDirectory: true)) { print(f.path) }
+        }
+        print(out.path)
     }
 }

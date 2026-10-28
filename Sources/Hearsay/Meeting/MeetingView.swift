@@ -168,6 +168,22 @@ struct InspectorHeader: View {
     }
 }
 
+/// "Move to": the other speakers on the line's side, then a new speaker. For a quiet person whose few
+/// lines diarization folded into someone else's.
+struct MoveLineMenu: View {
+    let model: MeetingModel
+    let line: TranscriptLines.Line
+
+    var body: some View {
+        Section("Move this line to") {
+            ForEach(model.moveTargets(for: line)) { s in
+                Button(s.name ?? s.label) { model.move(line, to: s.id) }
+            }
+            Button("New Speaker") { model.move(line, to: nil) }
+        }
+    }
+}
+
 /// "People on the call": when diarization merged several remote voices (one Zoom feed from a shared
 /// room often comes out as one Remote), you say how many spoke and the meeting is re-transcribed with
 /// at least that many call voices. Names typed on the old voices may land on other voices afterwards.
@@ -394,12 +410,25 @@ struct TranscriptPanel: View {
                             .frame(width: 52, alignment: .trailing)
                             .help("Play from here")
                             .accessibilityLabel("Play from \(ElapsedLabel.spoken(line.start))")
-                            Text(model.displayName(line.speaker)).fontWeight(.semibold).lineLimit(1).fixedSize()
-                                .foregroundStyle(model.color(for: line.speaker))
+                            if model.canReassign {
+                                Menu {
+                                    MoveLineMenu(model: model, line: line)
+                                } label: {
+                                    Text(model.displayName(line.speaker)).fontWeight(.semibold).lineLimit(1).fixedSize()
+                                        .foregroundStyle(model.color(for: line.speaker))
+                                }
+                                .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+                                .help("Wrong speaker? Move this line to someone else")
+                                .accessibilityHint("Move this line to another speaker")
+                            } else {
+                                Text(model.displayName(line.speaker)).fontWeight(.semibold).lineLimit(1).fixedSize()
+                                    .foregroundStyle(model.color(for: line.speaker))
+                            }
                             Text(line.text).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .padding(.vertical, 2).padding(.horizontal, 4)
                         .background(current ? Color.accentColor.opacity(0.15) : .clear, in: RoundedRectangle(cornerRadius: 4))
+                        .contextMenu { if model.canReassign { MoveLineMenu(model: model, line: line) } }
                         .accessibilityElement(children: .combine)
                         .accessibilityAddTraits(current ? .isSelected : [])
                         .id(line.id)
