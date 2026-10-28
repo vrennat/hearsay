@@ -8,6 +8,11 @@ struct MeetingView: View {
     @Bindable var model: MeetingModel
     @State private var search = ""
     @AppStorage("meetingInspectorShown") private var inspectorShown = true
+    /// The pane's width. Below `inspectorFits` the inspector steps aside instead of forcing the split
+    /// view wider, which shoved the sidebar off the window's edge when a meeting was selected.
+    @State private var paneWidth: CGFloat = 1000
+    static let minTranscript: CGFloat = 320
+    private var inspectorFits: Bool { paneWidth >= Self.minTranscript + 240 + 1 }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -32,8 +37,8 @@ struct MeetingView: View {
                     TranscriptPanel(model: model, query: search)
                 }
             }
-            .frame(minWidth: 400, maxWidth: .infinity)
-            if inspectorShown, !model.isRecording {
+            .frame(minWidth: Self.minTranscript, maxWidth: .infinity)
+            if inspectorShown, inspectorFits, !model.isRecording {
                 // A fixed trailing column rather than `.inspector`: inside this NavigationSplitView
                 // (hosted in an NSWindow) `.inspector` crashed AppKit's constraint pass below about
                 // 1,100 pt wide, even with Text("x") as its content. See CLAUDE.md, Meeting UI.
@@ -46,6 +51,7 @@ struct MeetingView: View {
             }
         }
         .frame(minHeight: 360)
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { paneWidth = $0 }
         .background(Color(nsColor: .windowBackgroundColor))
         .searchable(text: $search, placement: .toolbar, prompt: "Search transcript")
         .toolbar {
@@ -70,7 +76,9 @@ struct MeetingView: View {
                     Label(inspectorShown ? "Hide Inspector" : "Show Inspector", systemImage: "sidebar.trailing")
                 }
                 .keyboardShortcut("i", modifiers: [.command, .option])
-                .help(inspectorShown ? "Hide speakers and files (⌥⌘I)" : "Show speakers and files (⌥⌘I)")
+                .help(!inspectorFits ? "Widen the window to show speakers and files"
+                      : inspectorShown ? "Hide speakers and files (⌥⌘I)" : "Show speakers and files (⌥⌘I)")
+                .disabled(!inspectorFits || model.isRecording)
             }
         }
     }
