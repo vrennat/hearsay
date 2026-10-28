@@ -11,12 +11,26 @@ struct LiveRecordingPane: View {
     @FocusState private var focused: String?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    @State private var width: CGFloat = 0
+
     var body: some View {
-        HStack(spacing: 0) {
-            lineList.frame(minWidth: 320, maxWidth: .infinity)
-            Divider()
-            speakerList.frame(width: 240)
+        // Narrow: speakers go under the lines instead of forcing the window wider.
+        Group {
+            if width >= 320 + 240 + 1 {
+                HStack(spacing: 0) {
+                    lineList.frame(minWidth: 320, maxWidth: .infinity)
+                    Divider()
+                    speakerList.frame(width: 240)
+                }
+            } else {
+                VStack(spacing: 0) {
+                    lineList.frame(maxHeight: .infinity)
+                    Divider()
+                    speakerList.frame(height: 180)
+                }
+            }
         }
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width = $0 }
     }
 
     private func matches(_ line: LiveLine) -> Bool {
