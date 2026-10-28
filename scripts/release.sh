@@ -92,6 +92,13 @@ SIG="$("$SPARKLE_BIN/sign_update" "$ZIP")" || die "sign_update failed (is the Sp
 BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Contents/Info.plist")"
 [[ "$BUILD" == "$WANT_BUILD" ]] || die "built CFBundleVersion $BUILD, expected $WANT_BUILD"
 APPCAST="$OUT/appcast.xml"
+# Release notes inline: one line per feat/fix commit since the last tag. A releaseNotesLink to the
+# GitHub release page made Sparkle's update window show the whole GitHub page in its web view.
+PREV_TAG="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+NOTES="$(git log --format=%s ${PREV_TAG:+$PREV_TAG..}HEAD | grep -E '^(feat|fix)(\(.*\))?: ' \
+  | sed -E 's/^(feat|fix)(\([^)]*\))?: //; s/ \(#[0-9]+\)$//; s/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g' \
+  | awk '{ printf "<li>%s</li>", toupper(substr($0,1,1)) substr($0,2) }' || true)"
+[[ -n "$NOTES" ]] || NOTES="<li>Fixes and improvements.</li>"
 cat > "$APPCAST" <<XML
 <?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
@@ -103,7 +110,7 @@ cat > "$APPCAST" <<XML
       <sparkle:version>$BUILD</sparkle:version>
       <sparkle:shortVersionString>$WANT</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <sparkle:releaseNotesLink>https://github.com/vrennat/hearsay/releases/tag/$TAG</sparkle:releaseNotesLink>
+      <description><![CDATA[<ul>$NOTES</ul>]]></description>
       <enclosure url="https://github.com/vrennat/hearsay/releases/download/$TAG/Hearsay-$WANT.zip" $SIG type="application/octet-stream"/>
     </item>
   </channel>

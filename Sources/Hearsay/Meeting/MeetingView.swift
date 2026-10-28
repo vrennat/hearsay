@@ -8,6 +8,11 @@ struct MeetingView: View {
     @Bindable var model: MeetingModel
     @State private var search = ""
     @AppStorage("meetingInspectorShown") private var inspectorShown = true
+    /// The pane's width. Below `inspectorFits` the inspector steps aside instead of forcing the split
+    /// view wider, which shoved the sidebar off the window's edge when a meeting was selected.
+    @State private var paneWidth: CGFloat = 0  // inspector waits for the first measurement rather than overflowing
+    static let minTranscript: CGFloat = 320
+    private var inspectorFits: Bool { paneWidth >= Self.minTranscript + 240 + 1 }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -32,8 +37,8 @@ struct MeetingView: View {
                     TranscriptPanel(model: model, query: search)
                 }
             }
-            .frame(minWidth: 400, maxWidth: .infinity)
-            if inspectorShown, !model.isRecording {
+            .frame(minWidth: Self.minTranscript, maxWidth: .infinity)
+            if inspectorShown, inspectorFits, !model.isRecording {
                 // A fixed trailing column rather than `.inspector`: inside this NavigationSplitView
                 // (hosted in an NSWindow) `.inspector` crashed AppKit's constraint pass below about
                 // 1,100 pt wide, even with Text("x") as its content. See CLAUDE.md, Meeting UI.
@@ -46,6 +51,7 @@ struct MeetingView: View {
             }
         }
         .frame(minHeight: 360)
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { paneWidth = $0 }
         .background(Color(nsColor: .windowBackgroundColor))
         .searchable(text: $search, placement: .toolbar, prompt: "Search transcript")
         .toolbar {
@@ -70,7 +76,9 @@ struct MeetingView: View {
                     Label(inspectorShown ? "Hide Inspector" : "Show Inspector", systemImage: "sidebar.trailing")
                 }
                 .keyboardShortcut("i", modifiers: [.command, .option])
-                .help(inspectorShown ? "Hide speakers and files (⌥⌘I)" : "Show speakers and files (⌥⌘I)")
+                .help(!inspectorFits ? "Widen the window to show speakers and files"
+                      : inspectorShown ? "Hide speakers and files (⌥⌘I)" : "Show speakers and files (⌥⌘I)")
+                .disabled(!inspectorFits || model.isRecording)
             }
         }
     }
@@ -157,6 +165,22 @@ struct InspectorHeader: View {
     init(_ title: String) { self.title = title }
     var body: some View {
         Text(title).font(.headline).accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// "Move to": the other speakers on the line's side, then a new speaker. For a quiet person whose few
+/// lines diarization folded into someone else's.
+struct MoveLineMenu: View {
+    let model: MeetingModel
+    let line: TranscriptLines.Line
+
+    var body: some View {
+        Section("Move this line to") {
+            ForEach(model.moveTargets(for: line)) { s in
+                Button(s.name ?? s.label) { model.move(line, to: s.id) }
+            }
+            Button("New Speaker") { model.move(line, to: nil) }
+        }
     }
 }
 
@@ -386,12 +410,25 @@ struct TranscriptPanel: View {
                             .frame(width: 52, alignment: .trailing)
                             .help("Play from here")
                             .accessibilityLabel("Play from \(ElapsedLabel.spoken(line.start))")
-                            Text(model.displayName(line.speaker)).fontWeight(.semibold).lineLimit(1).fixedSize()
-                                .foregroundStyle(model.color(for: line.speaker))
+                            if model.canReassign {
+                                Menu {
+                                    MoveLineMenu(model: model, line: line)
+                                } label: {
+                                    Text(model.displayName(line.speaker)).fontWeight(.semibold).lineLimit(1).fixedSize()
+                                        .foregroundStyle(model.color(for: line.speaker))
+                                }
+                                .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+                                .help("Wrong speaker? Move this line to someone else")
+                                .accessibilityHint("Move this line to another speaker")
+                            } else {
+                                Text(model.displayName(line.speaker)).fontWeight(.semibold).lineLimit(1).fixedSize()
+                                    .foregroundStyle(model.color(for: line.speaker))
+                            }
                             Text(line.text).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .padding(.vertical, 2).padding(.horizontal, 4)
                         .background(current ? Color.accentColor.opacity(0.15) : .clear, in: RoundedRectangle(cornerRadius: 4))
+                        .contextMenu { if model.canReassign { MoveLineMenu(model: model, line: line) } }
                         .accessibilityElement(children: .combine)
                         .accessibilityAddTraits(current ? .isSelected : [])
                         .id(line.id)
