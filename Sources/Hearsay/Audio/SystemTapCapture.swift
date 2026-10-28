@@ -24,6 +24,8 @@ final class SystemTapCapture {
     /// Every buffer and its host time, on the IO queue (the live transcript). The buffer does not own
     /// its memory: copy before returning.
     var onPCM: (@Sendable (AVAudioPCMBuffer, UInt64) -> Void)?
+    /// Set by the session; while paused every buffer is dropped.
+    var gate: PauseGate?
 
     init(url: URL, meetingStartHostTime: UInt64) {
         self.url = url
@@ -133,6 +135,7 @@ final class SystemTapCapture {
         let writer = self.writer!
         let onBuffer = self.onBuffer
         let onPCM = self.onPCM
+        let gate = self.gate
         // The aggregate's input buffer list holds the output device's own input streams first, then
         // the tap. On an interface with inputs (a MOTU M4: one 4-channel buffer ahead of the tap's
         // stereo one) the whole list is not a stereo buffer, so pick the tap's by position.
@@ -146,9 +149,11 @@ final class SystemTapCapture {
             guard let buffer = AVAudioPCMBuffer(pcmFormat: tapFormat, bufferListNoCopy: &single, deallocator: nil),
                   buffer.frameLength > 0 else { return }
             let t = inTime.pointee
-            let host = t.mFlags.contains(.hostTimeValid) ? t.mHostTime : HostClock.now()
+            let raw = t.mFlags.contains(.hostTimeValid) ? t.mHostTime : HostClock.now()
+            if gate?.drops(raw) == true { return }
+            let host = gate?.shift(raw) ?? raw  // recording clock: pauses cut out
             let db = writer.append(buffer, hostTime: host)
-            onBuffer?(db, HostClock.seconds(host))
+            onBuffer?(db, HostClock.seconds(raw))
             onPCM?(buffer, host)
         }, "AudioDeviceCreateIOProcIDWithBlock")
         procID = proc

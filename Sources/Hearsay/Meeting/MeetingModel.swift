@@ -40,7 +40,7 @@ final class MeetingModel {
         reload()
     }
 
-    var isRecording: Bool { AppModel.shared.session?.meetingID == id }
+    var isRecording: Bool { MainWindowModel.shared.recordingID == id }  // the preview's stand-in too
     var isQueued: Bool { AppModel.shared.queue.busy.contains(id) }
     /// Being transcribed now (the queue's current item), as opposed to waiting in the queue.
     var isProcessing: Bool { AppModel.shared.queue.current == id }
@@ -152,6 +152,23 @@ final class MeetingModel {
             log.error("Rename \(speaker) in \(id): \(error)")
         }
         reload()
+    }
+
+    var hasCallAudio: Bool { meeting.streams.contains { $0.kind == .system } }
+
+    /// Saves how many people spoke on the call and re-transcribes with at least that many call voices.
+    func rediarize(callSpeakers n: Int) {
+        guard canReprocess else { return }
+        do {
+            try MeetingEdits.setCallSpeakers(id: id, count: n, store: store)
+            editError = nil
+            log.info("\(id): call speakers set to \(n)")
+        } catch {
+            editError = "Could not save the speaker count: \(error)"
+            return
+        }
+        reload()
+        reprocess()
     }
 
     func reprocess() {

@@ -110,7 +110,8 @@ public enum ProcessPipeline {
             let tracks = try Track.load(meeting, store: store)
             guard !tracks.isEmpty else { throw NothingUsable.noAudio }
             let heard = heardStreams((try? store.loadLive(id)) ?? nil)
-            var transcript = try await transcribe(meeting.id, tracks: tracks, engines: options.engines, heard: heard)
+            var transcript = try await transcribe(meeting.id, tracks: tracks, engines: options.engines, heard: heard,
+                                                  callSpeakers: meeting.callSpeakers)
             guard !transcript.utterances.isEmpty else { throw NothingUsable.noSpeech }
             transcript = Glossary.load(root: store.root).apply(to: transcript)
             try await SpeakerIdentity.embed(&transcript, tracks: tracks, embedder: options.engines.embedder)
@@ -158,7 +159,8 @@ public enum ProcessPipeline {
         Set((live?.lines ?? []).filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.map(\.stream))
     }
 
-    static func transcribe(_ id: String, tracks: [Track], engines: PipelineEngines, heard: Set<StreamKind> = []) async throws -> Transcript {
+    static func transcribe(_ id: String, tracks: [Track], engines: PipelineEngines, heard: Set<StreamKind> = [],
+                           callSpeakers: Int? = nil) async throws -> Transcript {
         var words: [StreamKind: [Word]] = [:]
         var curves: [StreamKind: [Float]] = [:]
         for t in tracks {
@@ -188,13 +190,22 @@ public enum ProcessPipeline {
             guard let w = words[t.kind], !w.isEmpty else { continue }
             var segments: [DiarSegment] = []
             do {
-                segments = try await engines.diarizer.diarize(t.samples)
+                // A count you gave for the call gets its own diarizer; the shared one keeps the defaults.
+                let diarizer: SpeakerDiarizer
+                if t.kind == .system, let n = callSpeakers, n > 1 {
+                    var tuning = SpeakerDiarizer.Tuning(); tuning.minSpeakers = n
+                    diarizer = SpeakerDiarizer(tuning: tuning)
+                } else { diarizer = engines.diarizer }
+                segments = try await diarizer.diarize(t.samples)
                     .map { DiarSegment(slot: $0.slot, start: $0.start + t.startOffset, end: $0.end + t.startOffset) }
             } catch {
-                // One voice is a better transcript than none.
-                log.error("\(id, privacy: .public): diarizing \(t.kind.rawValue, privacy: .public) failed, one speaker: \(String(describing: error), privacy: .public)")
+                // One voice is a better transcript than none. In the file log too: this is the first
+                // thing to check when a call comes out as one speaker.
+                HSLog("diarizer").error("\(id): diarizing \(t.kind.rawValue) failed, one speaker: \(error)")
             }
-            let built = Attribution.build(words: w, segments: segments, stream: t.kind)
+            let forced = t.kind == .system && (callSpeakers ?? 0) > 1
+            let built = Attribution.build(words: w, segments: segments, stream: t.kind, foldTiny: !forced)
+            HSLog("diarizer").info("\(id): \(t.kind.rawValue) \(Int(Double(t.samples.count) / AudioLoader.sampleRate)) s, \(segments.count) segments, \(Set(segments.map(\.slot)).count) diarizer voices, \(built.speakers.count) speakers after folding")
             speakers += built.speakers
             utterances += built.utterances
         }

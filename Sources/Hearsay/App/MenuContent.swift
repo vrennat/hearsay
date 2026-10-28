@@ -228,7 +228,7 @@ struct MenuSectionHeader: View {
 
 enum MenuControl: Hashable, CaseIterable { case mic, call, live, pill, dictation, cleanup }
 
-/// Mic and Call audio are status tiles; Live window opens the window; Timer, Dictation and Cleanup toggle
+/// Mic and Call audio are status tiles; Live transcript opens the recording meeting in the Hearsay window; Timer, Dictation and Cleanup toggle
 /// the same `Prefs` keys as Settings. Six tiles fill the 3-column grid (five left a hole: Tanner).
 struct ControlGrid: View {
     let model: AppModel
@@ -245,7 +245,7 @@ struct ControlGrid: View {
                     selected = c
                     switch c {
                     case .mic, .call: break
-                    case .live: LiveWindowController.shared.show()
+                    case .live: MainWindowController.shared.showRecording()
                     case .pill: notchPill.toggle()
                     case .dictation:
                         dictation.toggle()
@@ -305,7 +305,7 @@ struct ControlInfo {
                 details = "Other apps’ sound (Zoom, Meet, FaceTime) is recorded too, but not Hearsay’s own."
             }
         case .live:
-            title = "Live window"; symbol = "text.bubble"; isToggle = false; level = nil
+            title = "Live transcript"; symbol = "text.bubble"; isToggle = false; level = nil
             disabled = s == nil; tone = s == nil ? .off : .on
             state = s == nil ? "Not recording" : "Open"
             details = "The transcript as it is spoken. Name speakers while the meeting runs."

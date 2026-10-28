@@ -2,62 +2,21 @@ import AppKit
 import HearsayCore
 import SwiftUI
 
-/// The Live window: live lines with speaker labels (auto-scrolling) and the live speakers. Clicking a
-/// speaker's name field (or a line's label, which focuses that field) renames it live; "Sounds like X" hints sit under the field.
-@MainActor
-final class LiveWindowController {
-    static let shared = LiveWindowController()
-    private(set) var window: NSWindow?
-
-    @discardableResult
-    func show() -> NSWindow? {
-        if window == nil {
-            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 460),
-                             styleMask: [.titled, .closable, .resizable, .miniaturizable, .fullSizeContentView], backing: .buffered, defer: false)
-            w.title = "Live Transcript"
-            w.toolbarStyle = .unified
-            w.isReleasedWhenClosed = false
-            w.setFrameAutosaveName("HearsayLiveWindow")
-            // Hosting view inside a plain container, as for the pill: a hosting content view can drive
-            // window resizes.
-            let container = NSView(frame: w.contentRect(forFrameRect: w.frame))
-            let host = NSHostingView(rootView: LiveWindowView(model: LiveModel.shared))
-            host.sizingOptions = []
-            host.sceneBridgingOptions = [.toolbars]  // `.searchable` becomes the window's toolbar
-            host.frame = container.bounds
-            host.autoresizingMask = [.width, .height]
-            container.addSubview(host)
-            w.contentView = container
-            w.center()
-            window = w
-        }
-        AppWindows.willShow()
-        NSApp.activate()
-        window?.makeKeyAndOrderFront(nil)
-        return window
-    }
-}
-
-struct LiveWindowView: View {
+/// The live transcript inside the main window's meeting pane while that meeting records (Tanner: no
+/// separate Live window). Lines auto-scroll on each 2 s live save; the trailing column lists the live
+/// voices with a name field each, which renames live; clicking a line's label focuses that field.
+struct LiveRecordingPane: View {
     let model: LiveModel
+    var search = ""
     @FocusState private var focused: String?
-    @State private var search = ""
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        // A split view, not an HSplitView: the sidebar list style only draws its material and sits
-        // under a unified toolbar correctly inside NavigationSplitView (in a bare window it bled
-        // the wallpaper tint up over the title bar).
-        NavigationSplitView {
-            speakerList.navigationSplitViewColumnWidth(min: 170, ideal: 200, max: 260)
-        } detail: {
-            lineList.frame(minWidth: 320)
+        HStack(spacing: 0) {
+            lineList.frame(minWidth: 320, maxWidth: .infinity)
+            Divider()
+            speakerList.frame(width: 240)
         }
-        .frame(minWidth: 520, minHeight: 300)
-        .searchable(text: $search, placement: .toolbar, prompt: "Search live transcript")
-        // Recording state as the window subtitle under "Live Transcript": the earlier bordered
-        // "Recording" toolbar item read as a button and sat oddly beside the search field (Tanner).
-        .navigationSubtitle(model.isRecording ? "Recording · \(Consent.reminder)" : "Not recording")
     }
 
     private func matches(_ line: LiveLine) -> Bool {

@@ -77,9 +77,9 @@ enum StandardMenu {
             for w in rec.warnings.map(\.text).sorted() {
                 e.append(MenuEntry(id: "w-\(w)", title: w, symbol: "exclamationmark.triangle", kind: .status))
             }
-            e.append(MenuEntry(id: "live", title: "Live Window…", symbol: "text.bubble",
-                               help: "Show the transcript as it is spoken",
-                               kind: .action { _ = LiveWindowController.shared.show() }))
+            e.append(MenuEntry(id: "live", title: "Live Transcript…", symbol: "text.bubble",
+                               help: "Show the transcript as it is spoken, in the Hearsay window",
+                               kind: .action { MainWindowController.shared.showRecording() }))
         } else if let err = model.lastError {
             e.append(MenuEntry(id: "err", title: err, symbol: "exclamationmark.triangle", kind: .status))
         }

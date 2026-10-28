@@ -53,6 +53,20 @@ final class RecordingSession {
     private var ticker: Timer?
     private var lastMicRetry: Double = 0
     private(set) var isStopped = false
+    private let pauseGate = PauseGate()
+    /// Paused from the pill: nothing is recorded or transcribed until resumed.
+    private(set) var isPaused = false
+    /// Host seconds of the last resume; the mic watchdog counts from here, not from the last buffer.
+    private var resumedAt: Double?
+
+    func setPaused(_ paused: Bool) {
+        guard !isStopped, paused != isPaused else { return }
+        isPaused = paused
+        pauseGate.set(paused, at: HostClock.now())
+        if !paused { resumedAt = HostClock.seconds(HostClock.now()) }
+        log.info(paused ? "Paused" : "Resumed")
+        Announce.post(paused ? "Recording paused" : "Recording resumed")
+    }
 
     private init(store: MeetingStore, meeting: Meeting, startHost: UInt64, sleepGuard: SleepGuard) {
         self.store = store
@@ -82,6 +96,8 @@ final class RecordingSession {
     }
 
     private func begin() {
+        mic.gate = pauseGate
+        tap.gate = pauseGate
         let box = LevelBox.shared
         box.reset()
         mic.onBuffer = { db, t in box.record(.mic, db, t) }
@@ -118,7 +134,9 @@ final class RecordingSession {
         RecordingUI.shared.tick(self, nowHost: now, mic: m, system: s, callAppAudio: callApps.callAppAudio)
 
         // Mic watchdog: no buffer for 10 s -> warn, notify once, retry every 10 s; clear on return.
-        let sinceMic = now - (m.lastBufferAt ?? HostClock.seconds(startHost))
+        // Paused: no buffers on purpose. After a resume, count from the resume.
+        if isPaused { return }
+        let sinceMic = now - max(m.lastBufferAt ?? HostClock.seconds(startHost), resumedAt ?? 0)
         if sinceMic >= Self.micSilenceLimit {
             if !warnings.contains(.micSilent) {
                 warnings.insert(.micSilent)

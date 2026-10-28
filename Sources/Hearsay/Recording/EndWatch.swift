@@ -55,6 +55,13 @@ final class EndWatch {
         if let prompt { post(prompt) }
     }
 
+    /// After a pause: count silence from now, as if both streams had just been heard.
+    func resumed(nowHost: Double) {
+        let now = nowHost - startHostSeconds
+        _ = detector.handle(.micLoud(now))
+        _ = detector.handle(.systemLoud(now))
+    }
+
     func end() {
         meetingID = nil
         if NotificationRouter.available {

@@ -16,6 +16,7 @@ final class RecordingUI {
     private var lastPillSecond = -1
     private var finishing: Task<Void, Never>?
     private var micSilentAnnounced = false
+    private var wasPaused = false
 
     /// Launch: notification delegate and categories; `--preview-pill`.
     func install() {
@@ -68,6 +69,7 @@ final class RecordingUI {
             m.title = s.meeting.title
             m.onStop = { AppModel.shared.stop(reason: "pill Stop") }
             m.onKeepGoing = { RecordingUI.shared.clearEndPrompt() }
+            m.onPause = { AppModel.shared.session.map { $0.setPaused(!$0.isPaused) } }
             pill = m
             lastPillSecond = -1
             NotchPillController.shared.show(model: m)
@@ -76,8 +78,14 @@ final class RecordingUI {
 
     /// From the session's 10 Hz tick.
     func tick(_ s: RecordingSession, nowHost: Double, mic: AudioLevel, system: AudioLevel, callAppAudio: Bool) {
-        endWatch.tick(nowHost: nowHost, mic: mic, system: system, callAppAudio: callAppAudio)
+        // A pause is not the meeting going quiet: no end prompts while paused, and the silence clock
+        // restarts at the resume.
+        if s.isPaused { wasPaused = true } else {
+            if wasPaused { wasPaused = false; endWatch.resumed(nowHost: nowHost) }
+            endWatch.tick(nowHost: nowHost, mic: mic, system: system, callAppAudio: callAppAudio)
+        }
         if let pill {
+            if pill.paused != s.isPaused { pill.paused = s.isPaused }
             let sec = Int(s.elapsed)
             if sec != lastPillSecond { lastPillSecond = sec; pill.elapsed = s.elapsed }
             let warn = s.warnings.contains(.micSilent)
@@ -94,6 +102,7 @@ final class RecordingUI {
     /// `willStart` waits for this, so a quick restart cannot interleave two meetings in the live engines.
     func didStop(_ s: RecordingSession, then processed: @escaping @MainActor () -> Void) {
         endWatch.end()
+        wasPaused = false
         LiveModel.shared.end()
         NotchPillController.shared.hide()
         pill = nil

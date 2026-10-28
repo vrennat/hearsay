@@ -30,7 +30,8 @@ struct MainMenuCommands: Commands {
         }
         SidebarCommands()
         CommandGroup(after: .sidebar) {
-            Button("Live Window") { LiveWindowController.shared.show() }
+            Button("Live Transcript") { MainWindowController.shared.showRecording() }
+                .disabled(!model.isRecording)
         }
         CommandGroup(replacing: .help) {
             Button("Hearsay Help") { NSWorkspace.shared.open(MenuContent.helpURL) }

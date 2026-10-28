@@ -7,7 +7,7 @@ import SwiftUI
 /// `--preview-menu --preview-snapshot PNG` renders the menu panel (with `--preview-menu-style panel`;
 /// in the default `menu` style it prints the standard menu's items, shortcuts and states to stdout); `--preview-settings TAB
 /// --preview-snapshot PNG` renders one Settings tab (general, recording, storage, dictation, agents);
-/// `--preview-live` renders the Live window; `--preview-main [--preview-main-select ID] [--preview-main-width PT] [--preview-main-recording ID]`
+/// `--preview-main [--preview-main-select ID] [--preview-main-width PT] [--preview-main-recording ID]`
 /// renders the main window (ID stands in for a live session; a seeded `recording` status would be recovered at launch) and logs its toolbar and main menu;
 /// `--preview-menu-icon DIR` writes every menu bar icon state at 1x and 2x, light and dark. `--preview-dark` renders in Dark Mode.
 /// With `--preview-menu`: `--preview-menu-recording` shows a synthetic recording (mic hearing, call
@@ -33,6 +33,14 @@ enum MenuPreview {
                 MainActor.assumeIsolated {
                     let model = MainWindowModel.shared
                     model.previewRecordingID = value("--preview-main-recording")
+                    if model.previewRecordingID != nil {
+                        // Sample lines so the live pane and its name fields have something to show.
+                        LiveModel.shared.update([
+                            LiveLine(speaker: "mic-1", stream: .mic, start: 2, end: 6, text: "Morning, Priya, can you hear me?"),
+                            LiveLine(speaker: "sys-1", stream: .system, start: 7, end: 12, text: "Loud and clear. Omar is joining late."),
+                            LiveLine(speaker: "sys-2", stream: .system, start: 13, end: 19, text: "Sorry, I'm here now."),
+                        ])
+                    }
                     let w = MainWindowController.shared.show()
                     if let width = value("--preview-main-width").flatMap(Double.init) {
                         w.setContentSize(NSSize(width: width, height: w.contentRect(forFrameRect: w.frame).height))
@@ -48,29 +56,6 @@ enum MenuPreview {
                             }
                             log.info("Sidebar groups: \(model.groups.map { "\($0.title) \($0.meetings.count)" })")
                             if let path = value("--preview-snapshot") { MeetingPreview.snapshot(w, to: URL(fileURLWithPath: path), frame: true) }
-                            NSApp.terminate(nil)
-                        }
-                    }
-                }
-            }
-            return
-        }
-        if args.contains("--preview-live") {
-            // The Live window as opened from the menu (empty unless a recording is running).
-            DispatchQueue.main.async {
-                MainActor.assumeIsolated {
-                    // Sample lines so the speaker list and its name fields have something to show.
-                    LiveModel.shared.update([
-                        LiveLine(speaker: "mic-1", stream: .mic, start: 2, end: 6, text: "Morning, Priya, can you hear me?"),
-                        LiveLine(speaker: "sys-1", stream: .system, start: 7, end: 12, text: "Loud and clear. Omar is joining late."),
-                        LiveLine(speaker: "sys-2", stream: .system, start: 13, end: 19, text: "Sorry, I'm here now."),
-                    ])
-                    guard let w = LiveWindowController.shared.show() else { return }
-                    if args.contains("--preview-dark") { w.appearance = NSAppearance(named: .darkAqua) }
-                    guard let path = value("--preview-snapshot") else { return }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                        MainActor.assumeIsolated {
-                            MeetingPreview.snapshot(w, to: URL(fileURLWithPath: path))
                             NSApp.terminate(nil)
                         }
                     }

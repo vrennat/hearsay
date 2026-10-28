@@ -25,6 +25,9 @@ public struct Meeting: Codable, Sendable, Equatable {
     /// every meeting before 0.1.3): nobody knows which names were guessed, so only `confirmedSpeakers`
     /// count as yours. Omitted when nil, so re-saving an old meeting never claims its guesses were typed.
     public var inferredSpeakers: [String]?
+    /// How many people spoke on the call (system stream), set by you when diarization merged them.
+    /// Processing then asks the diarizer for at least this many call voices. Nil: let it decide.
+    public var callSpeakers: Int?
     /// Old meetings only (`inferredSpeakers` nil): speakers whose name you confirmed or typed since.
     public var confirmedSpeakers: [String] = []
 
@@ -62,7 +65,7 @@ public struct Meeting: Codable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case id, title, startedAt, endedAt, status, error, engine, streams, speakerNames
-        case echoCancellation, appVersion, attendees, me, audioRemovedAt, titleEditedByUser, inferredSpeakers, confirmedSpeakers
+        case echoCancellation, appVersion, attendees, me, audioRemovedAt, titleEditedByUser, inferredSpeakers, confirmedSpeakers, callSpeakers
     }
 
     public init(from decoder: Decoder) throws {
@@ -84,6 +87,7 @@ public struct Meeting: Codable, Sendable, Equatable {
         titleEditedByUser = try c.decodeIfPresent(Bool.self, forKey: .titleEditedByUser) ?? false
         inferredSpeakers = try c.decodeIfPresent([String].self, forKey: .inferredSpeakers)
         confirmedSpeakers = try c.decodeIfPresent([String].self, forKey: .confirmedSpeakers) ?? []
+        callSpeakers = try c.decodeIfPresent(Int.self, forKey: .callSpeakers)
     }
 
     public var duration: TimeInterval? { endedAt.map { $0.timeIntervalSince(startedAt) } }

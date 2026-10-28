@@ -13,8 +13,11 @@ final class PillModel {
     var active = true
     /// "Meeting over?" reason while the end prompt is up; the pill stays expanded until it is answered.
     var endPrompt: String?
+    /// Recording paused from the pill: the meter rests and the elapsed label says Paused.
+    var paused = false
     @ObservationIgnored var onStop: () -> Void = {}
     @ObservationIgnored var onKeepGoing: () -> Void = {}
+    @ObservationIgnored var onPause: () -> Void = {}
     @ObservationIgnored var onHover: (Bool) -> Void = { _ in }
     @ObservationIgnored let meter: MeterState
 
@@ -201,6 +204,18 @@ struct NotchPillView: View {
                             .accessibilityLabel("Meeting: \(model.title)")
                         Spacer(minLength: 4)
                     }
+                    if model.endPrompt == nil {
+                        Button(action: model.onPause) {
+                            Image(systemName: model.paused ? "play.fill" : "pause.fill")
+                                .font(.system(size: 11, weight: .semibold))
+                                .frame(width: 26, height: 20)
+                                .background(Color.white.opacity(0.16), in: Capsule())
+                                .foregroundStyle(.white)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(model.paused ? "Resume Recording" : "Pause Recording")
+                        .help(model.paused ? "Resume recording" : "Pause recording: nothing is saved or transcribed until you resume, and the pause is cut out of the recording. macOS still shows the mic as in use.")
+                    }
                     Button(action: model.onStop) {
                         Label("Stop", systemImage: "stop.fill").labelStyle(.titleAndIcon)
                             .font(.system(size: 11, weight: .semibold))
@@ -245,7 +260,13 @@ struct NotchPillView: View {
             ElapsedLabel(elapsed: model.elapsed, warning: model.warning, reserveHours: false)
             // Colour is never the only signal: with no mic audio the meter gives way to a symbol and text.
             Group {
-                if model.warning {
+                if model.paused {
+                    Label("Paused", systemImage: "pause.fill")
+                        .labelStyle(.titleAndIcon)
+                        .font(.system(size: 10, weight: .semibold)).foregroundStyle(.white.opacity(0.8))
+                        .lineLimit(1).fixedSize()
+                        .accessibilityLabel("Recording paused")
+                } else if model.warning {
                     Label("No mic", systemImage: "mic.slash.fill")
                         .labelStyle(.titleAndIcon)
                         .font(.system(size: 10, weight: .semibold)).foregroundStyle(Color.orange)

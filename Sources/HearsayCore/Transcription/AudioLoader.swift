@@ -52,28 +52,32 @@ public enum AudioLoader {
         var readError: Error?
         var finished = false
 
-        while true {
-            let outCapacity = AVAudioFrameCount(Double(chunk) * sampleRate / format.sampleRate) + 1024
-            guard let out = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: outCapacity) else { break }
-            var convError: NSError?
-            let status = converter.convert(to: out, error: &convError) { _, inputStatus in
-                if finished { inputStatus.pointee = .endOfStream; return nil }
-                guard let inBuf = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: chunk) else {
-                    inputStatus.pointee = .endOfStream; return nil
+        // The converter's input block is escaping in the SDK's signature though it runs synchronously;
+        // Swift 6.3 rejects capturing the non-escaping `fill` without this.
+        try withoutActuallyEscaping(fill) { fill in
+            while true {
+                let outCapacity = AVAudioFrameCount(Double(chunk) * sampleRate / format.sampleRate) + 1024
+                guard let out = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: outCapacity) else { break }
+                var convError: NSError?
+                let status = converter.convert(to: out, error: &convError) { _, inputStatus in
+                    if finished { inputStatus.pointee = .endOfStream; return nil }
+                    guard let inBuf = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: chunk) else {
+                        inputStatus.pointee = .endOfStream; return nil
+                    }
+                    do { try fill(inBuf) } catch { readError = error }
+                    if inBuf.frameLength == 0 { finished = true; inputStatus.pointee = .endOfStream; return nil }
+                    // Fold to mono here, not in the converter: its downmix averages dead channels in.
+                    guard let mono = ChannelFold.mono(inBuf) else { inputStatus.pointee = .endOfStream; return nil }
+                    inputStatus.pointee = .haveData
+                    return mono
                 }
-                do { try fill(inBuf) } catch { readError = error }
-                if inBuf.frameLength == 0 { finished = true; inputStatus.pointee = .endOfStream; return nil }
-                // Fold to mono here, not in the converter: its downmix averages dead channels in.
-                guard let mono = ChannelFold.mono(inBuf) else { inputStatus.pointee = .endOfStream; return nil }
-                inputStatus.pointee = .haveData
-                return mono
+                if let convError { throw AudioLoaderError.unreadable(url, convError.localizedDescription) }
+                if let readError { throw AudioLoaderError.unreadable(url, readError.localizedDescription) }
+                if let data = out.floatChannelData, out.frameLength > 0 {
+                    samples.append(contentsOf: UnsafeBufferPointer(start: data[0], count: Int(out.frameLength)))
+                }
+                if status == .endOfStream || status == .error { break }
             }
-            if let convError { throw AudioLoaderError.unreadable(url, convError.localizedDescription) }
-            if let readError { throw AudioLoaderError.unreadable(url, readError.localizedDescription) }
-            if let data = out.floatChannelData, out.frameLength > 0 {
-                samples.append(contentsOf: UnsafeBufferPointer(start: data[0], count: Int(out.frameLength)))
-            }
-            if status == .endOfStream || status == .error { break }
         }
         return samples
     }

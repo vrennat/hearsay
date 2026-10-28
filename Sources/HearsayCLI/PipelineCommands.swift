@@ -62,6 +62,43 @@ struct RenameCommand: ParsableCommand {
     }
 }
 
+struct DiarizeCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "diarize",
+        abstract: "Re-run the diarizer on a meeting's audio at several clustering thresholds and print the voices found. Writes nothing.",
+        discussion: "Lower thresholds split more voices (default 0.6). Use it to tune diarization on a real recording.")
+    @Argument(help: "Meeting id (folder name).") var id: String
+    @Option(help: "Stream: mic or system.") var stream: String = "system"
+    @Option(parsing: .upToNextOption, help: "Thresholds to try.") var thresholds: [Double] = [0.6, 0.5, 0.45, 0.4, 0.35, 0.3]
+    @Option(help: "Also require at least this many voices.") var minSpeakers: Int?
+    @Option(help: "VBx Fa (default 0.07; higher trusts the acoustics more).") var fa: Double?
+    @Option(help: "VBx Fb (default 0.8; lower allows more speakers).") var fb: Double?
+    @Option(help: "VBx iterations (default 20; 1 stays closest to the first clustering).") var vbxIterations: Int?
+    @Option(help: "Shortest speech an embedding is taken from, seconds (default 1.0).") var minEmbeddingSeconds: Double?
+    @Flag(help: "Take embeddings from overlapped speech too.") var includeOverlap = false
+    @OptionGroup var root: RootOption
+
+    mutating func run() async throws {
+        let store = root.store
+        let m = try store.loadMeeting(id)
+        guard let kind = StreamKind(rawValue: stream), let track = try Track.load(m, store: store).first(where: { $0.kind == kind }) else {
+            throw ValidationError("No \(stream) audio in \(id)")
+        }
+        print("\(stream): \(Int(Double(track.samples.count) / AudioLoader.sampleRate)) s")
+        for t in thresholds {
+            var tuning = SpeakerDiarizer.Tuning()
+            tuning.threshold = t; tuning.minSpeakers = minSpeakers; tuning.fa = fa; tuning.fb = fb
+            tuning.vbxIterations = vbxIterations; tuning.minEmbeddingSeconds = minEmbeddingSeconds
+            tuning.includeOverlap = includeOverlap
+            let segs = try await SpeakerDiarizer(tuning: tuning).diarize(track.samples)
+            var talk: [String: Double] = [:]
+            for s in segs { talk[s.slot, default: 0] += s.end - s.start }
+            let voices = talk.sorted { $0.value > $1.value }.map { "\(Int($0.value))s" }.joined(separator: " ")
+            print("threshold \(t)\t\(talk.count) voices\t\(segs.count) segments\t\(voices)")
+        }
+    }
+}
+
 struct NamesCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "names",

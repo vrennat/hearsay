@@ -7,12 +7,40 @@ public actor SpeakerDiarizer {
     public static let name = "fluidaudio-offline"
     private static let log = HearsayCore.logger("diarizer")
     private var manager: OfflineDiarizerManager?
+    private let config: OfflineDiarizerConfig
 
-    public init() {}
+    /// Overrides of FluidAudio's offline defaults, for tuning (`hearsay diarize`). Nil keeps the default.
+    public struct Tuning: Sendable {
+        /// AHC cut distance between unit embeddings, [0, 2]; lower splits more voices (default 0.6).
+        public var threshold: Double?
+        /// VBx warm start: Fa weighs the acoustics (default 0.07), Fb the speaker prior (default 0.8).
+        public var fa: Double?
+        public var fb: Double?
+        /// VBx iterations (default 20, must be > 0); 1 stays closest to the AHC clusters.
+        public var vbxIterations: Int?
+        /// Shortest speech an embedding is taken from (default 1.0 s).
+        public var minEmbeddingSeconds: Double?
+        /// Take embeddings from overlapped speech too (default false).
+        public var includeOverlap = false
+        public var minSpeakers: Int?
+        public init() {}
+    }
+
+    public init(tuning: Tuning = Tuning()) {
+        var c = OfflineDiarizerConfig.default
+        if let v = tuning.threshold { c.clustering.threshold = v }
+        if let v = tuning.fa { c.clustering.warmStartFa = v }
+        if let v = tuning.fb { c.clustering.warmStartFb = v }
+        if let v = tuning.vbxIterations { c.vbx.maxIterations = v }
+        if let v = tuning.minEmbeddingSeconds { c.embedding.minSegmentDurationSeconds = v }
+        if tuning.includeOverlap { c.embedding.excludeOverlap = false }
+        if let v = tuning.minSpeakers { c.clustering.minSpeakers = v }
+        config = c
+    }
 
     public func load() async throws {
         guard manager == nil else { return }
-        let m = OfflineDiarizerManager(config: .default)
+        let m = OfflineDiarizerManager(config: config)
         try await m.prepareModels()
         manager = m
     }

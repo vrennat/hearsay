@@ -36,12 +36,14 @@ public enum Attribution {
     /// one-person mic track) far more often than someone speaks only one short phrase.
     public static let minSlotSeconds = 5.0
 
-    public static func build(words: [Word], segments: [DiarSegment], stream: StreamKind) -> (speakers: [Speaker], utterances: [Utterance]) {
+    /// `foldTiny` false keeps every slot: a voice you asked for ("People on the call") is not merged away.
+    public static func build(words: [Word], segments: [DiarSegment], stream: StreamKind,
+                             foldTiny: Bool = true) -> (speakers: [Speaker], utterances: [Utterance]) {
         var slots = words.map { slot(for: $0, in: segments) }
         var wordTime: [String: Double] = [:]
         for (w, s) in zip(words, slots) { wordTime[s, default: 0] += w.end - w.start }
         let total = wordTime.values.reduce(0, +)
-        let tiny = Set(wordTime.filter { $0.value < minSlotSeconds && $0.value < total * SpeakerSummary.mainShare }.keys)
+        let tiny = !foldTiny ? Set<String>() : Set(wordTime.filter { $0.value < minSlotSeconds && $0.value < total * SpeakerSummary.mainShare }.keys)
         let kept = segments.filter { !tiny.contains($0.slot) }
         if !tiny.isEmpty, !kept.isEmpty {
             slots = zip(words, slots).map { w, s in tiny.contains(s) ? slot(for: w, in: kept) : s }

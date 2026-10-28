@@ -29,6 +29,13 @@ final class MainWindowController: NSObject, NSWindowDelegate {
         return w
     }
 
+    /// The recording meeting's live transcript (the old Live window), else just the window.
+    @discardableResult
+    func showRecording() -> NSWindow {
+        guard let m = AppModel.shared.session?.meeting else { return show() }
+        return show(m)
+    }
+
     private func make() -> NSWindow {
         let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1180, height: 720),
                          styleMask: [.titled, .closable, .resizable, .miniaturizable, .fullSizeContentView],
@@ -104,13 +111,8 @@ struct MainToolbar: ToolbarContent {
     let model: MainWindowModel
 
     var body: some ToolbarContent {
-        // Separate items (not one group) so the toolbar renders two controls, with Record as the
-        // primary action on the trailing edge, like Voice Memos.
-        ToolbarItem(placement: .primaryAction) {
-            Button { LiveWindowController.shared.show() } label: { Label("Live Window", systemImage: "text.bubble") }
-                .help("Show the transcript as it is spoken")
-        }
-        ToolbarSpacer(.fixed, placement: .primaryAction)
+        // Record as the primary action on the trailing edge, like Voice Memos. The live transcript
+        // is the recording meeting's own pane, so there is no Live Window button.
         ToolbarItem(placement: .primaryAction) {
             if AppModel.shared.isRecording {
                 Button { AppModel.shared.stop() } label: { Label("Stop Recording", systemImage: "stop.fill") }

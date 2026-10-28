@@ -2,7 +2,7 @@ import Foundation
 import HearsayCore
 import Observation
 
-/// What the Live window shows: the live lines (refreshed at each `live.json` save, every 2 s), the live
+/// What the recording meeting's live pane shows: the live lines (refreshed at each `live.json` save, every 2 s), the live
 /// speakers with their typed names, and name hints (suggestions only, never applied).
 @MainActor @Observable
 final class LiveModel {

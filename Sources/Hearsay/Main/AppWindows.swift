@@ -6,7 +6,7 @@ import AppKit
 @MainActor
 enum AppWindows {
     private static var installed = false
-    private static var windows: [NSWindow?] { [MainWindowController.shared.window, LiveWindowController.shared.window] }
+    private static var windows: [NSWindow?] { [MainWindowController.shared.window] }
     /// Previews render without a Dock icon.
     private static let pinnedAccessory = CommandLine.arguments.contains { $0.hasPrefix("--preview-") }
 
