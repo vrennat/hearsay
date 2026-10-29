@@ -10,7 +10,7 @@ final class TranscriptLinesTests: XCTestCase {
 
             [00:03] **Room 1:** Morning, everyone.
 
-            [01:02:05] **Will:** Thanks: see you.
+            [01:02:05] **Rob:** Thanks: see you.
 
             not a line
             """
@@ -20,7 +20,7 @@ final class TranscriptLinesTests: XCTestCase {
         XCTAssertEqual(lines[0].start, 3)
         XCTAssertEqual(lines[0].end, 3725)
         XCTAssertEqual(lines[0].text, "Morning, everyone.")
-        XCTAssertEqual(lines[1].speaker, "Will")
+        XCTAssertEqual(lines[1].speaker, "Rob")
         XCTAssertEqual(lines[1].start, 3725)
         XCTAssertEqual(lines[1].text, "Thanks: see you.")
     }

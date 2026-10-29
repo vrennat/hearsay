@@ -32,7 +32,7 @@ enum TestSupport {
         let meeting = Meeting(
             id: "2026-10-02 1000 Small", title: "Small: sync", startedAt: start,
             endedAt: start.addingTimeInterval(125), status: .done, engine: "parakeet",
-            speakerNames: ["mic-1": "Tanner"], attendees: ["Tanner Vass", "Reese"])
+            speakerNames: ["mic-1": "Tanner"], attendees: ["Tanner Vass", "Priya"])
         let transcript = Transcript(
             engine: "parakeet", processedAt: date("2026-10-02T10:00:00.500Z"),
             speakers: [

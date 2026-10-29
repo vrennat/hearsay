@@ -7,7 +7,7 @@ final class ReassignTests: XCTestCase {
         let id = "m"
         try FileManager.default.createDirectory(at: store.folder(id), withIntermediateDirectories: true)
         try store.saveMeeting(Meeting(id: id, title: "m", startedAt: Date(), status: .done,
-                                      speakerNames: ["sys-1": "Reese", "sys-2": "Tyler"]))
+                                      speakerNames: ["sys-1": "Priya", "sys-2": "Omar"]))
         let at = Date(timeIntervalSince1970: 1_800_000_000)
         let u = [Utterance(speaker: "sys-1", stream: .system, start: 0, end: 10, text: "a"),
                  Utterance(speaker: "sys-1", stream: .system, start: 10, end: 12, text: "b"),
@@ -43,7 +43,7 @@ final class ReassignTests: XCTestCase {
         let t = try XCTUnwrap(try store.loadTranscript(id))
         XCTAssertNil(t.speaker("sys-2"))
         XCTAssertEqual(t.speaker("sys-1")?.talkSeconds, 15)
-        XCTAssertEqual(try store.loadMeeting(id).speakerNames, ["sys-1": "Reese"])
+        XCTAssertEqual(try store.loadMeeting(id).speakerNames, ["sys-1": "Priya"])
     }
 
     func testRoomAndCallNeverMix() throws {

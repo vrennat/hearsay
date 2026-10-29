@@ -23,13 +23,13 @@ private final class RecordingModel: TitleModel, @unchecked Sendable {
 
 final class TitleRulesTests: XCTestCase {
     func testGenericTitles() {
-        let names = ["Tanner Vass", "Will Example"]
+        let names = ["Tanner Vass", "Rob Example"]
         for t in ["", "Meeting", "Untitled", "Sync", "sync", "1:1", "Weekly 1:1", "Catch up", "Call", "Quick call",
-                  "Meeting Oct 23 09:30", "2026-10-23 09:30 Meeting", "Will / Tanner", "Will <> Tanner",
-                  "Catch up with Will", "Tanner and Will sync", "Team Standup"] {
+                  "Meeting Oct 23 09:30", "2026-10-23 09:30 Meeting", "Rob / Tanner", "Rob <> Tanner",
+                  "Catch up with Rob", "Tanner and Rob sync", "Team Standup"] {
             XCTAssertTrue(TitleRules.isGeneric(t, names: names), t)
         }
-        for t in ["Q4 Planning Review", "Fixture standup", "Small: sync", "Hearsay launch plan", "Will / Tanner: pricing"] {
+        for t in ["Q4 Planning Review", "Fixture standup", "Small: sync", "Hearsay launch plan", "Rob / Tanner: pricing"] {
             XCTAssertFalse(TitleRules.isGeneric(t, names: names), t)
         }
     }
@@ -53,7 +53,7 @@ final class TitleRulesTests: XCTestCase {
     }
 
     func testValidationRejections() {
-        let names = ["Reese Example", "Tanner Vass"]
+        let names = ["Priya Example", "Tanner Vass"]
         let cases: [(String, TitleRules.Rejection)] = [
             ("Pricing", .wordCount(1)),
             ("One Two Three Four Five Six Seven Eight Nine", .wordCount(9)),
@@ -67,10 +67,10 @@ final class TitleRulesTests: XCTestCase {
             ("Release Review on 10/23", .date),
             ("Monday Release Readiness Check", .date),
             ("Release Readiness Team Meeting", .meetingFiller),
-            ("Reese and Tanner", .nameOnly),
-            ("Reese Example Tanner", .nameOnly),
+            ("Priya and Tanner", .nameOnly),
+            ("Priya Example Tanner", .nameOnly),
             ("Weekly Team Sync", .generic),
-            ("Reese Tanner Catch Up", .generic),
+            ("Priya Tanner Catch Up", .generic),
         ]
         for (title, want) in cases {
             XCTAssertEqual(TitleRules.validate(title, names: names), .failure(want), title)
@@ -87,14 +87,14 @@ final class TitleRulesTests: XCTestCase {
                                   timeZone: TimeZone(identifier: "America/Los_Angeles")!)
         XCTAssertEqual(p, """
             Calendar title: Fixture standup
-            Attendees: Tanner Vass, Reese Example
+            Attendees: Tanner Vass, Priya Example
             Date: Thursday 1 October 2026, 09:30
             Duration: 1 min
-            Speakers: Reese, Tanner, Remote 2
+            Speakers: Priya, Tanner, Remote 2
 
             Transcript (start):
             Tanner: So the build is green.
-            Reese: Great, ship it today.
+            Priya: Great, ship it today.
             Remote 2: Bye.
             """)
         // A recorder placeholder is not a calendar title.
@@ -139,10 +139,10 @@ final class TitleGeneratorTests: XCTestCase {
     func testFallbacks() async {
         let (m, t) = meeting("")
         let dateTitle = Titler.dateTimeTitle(m.startedAt)
-        var o = await TitleGenerator.title(meeting: m, transcript: t, cleanup: nil, model: StubModel(answer: "Tanner and Reese"))
+        var o = await TitleGenerator.title(meeting: m, transcript: t, cleanup: nil, model: StubModel(answer: "Tanner and Priya"))
         XCTAssertEqual(o.title, dateTitle)
         XCTAssertEqual(o.source, .fallback)
-        XCTAssertEqual(o.reason, "rejected \"Tanner and Reese\": only a person's name")
+        XCTAssertEqual(o.reason, "rejected \"Tanner and Priya\": only a person's name")
 
         o = await TitleGenerator.title(meeting: m, transcript: t, cleanup: nil,
                                        model: StubModel(error: TitleModelError.unavailable("Apple Intelligence is turned off in System Settings.")))

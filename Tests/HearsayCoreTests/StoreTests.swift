@@ -14,7 +14,7 @@ import Testing
         #expect(m.streams[1].sampleRate == nil)
         #expect(m.echoCancellation == nil)
         #expect(m.audioRemovedAt == nil)
-        #expect(m.speakerNames["sys-1"] == "Reese")
+        #expect(m.speakerNames["sys-1"] == "Priya")
         #expect(m.duration.map { abs($0 - 65.5) < 0.001 } == true)
 
         let t = try #require(try store.loadTranscript(id))

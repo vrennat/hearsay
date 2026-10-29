@@ -6,7 +6,7 @@ import Testing
     # comment => ignored
     hear say => Hearsay
     fluid audio => FluidAudio
-    reece => reese
+    reece => priya
     bad line
     """)
 
@@ -19,7 +19,7 @@ import Testing
     }
 
     @Test func preservesCaseForLowercaseReplacements() {
-        #expect(g.apply("reece, Reece, REECE, reeces") == "reese, Reese, REESE, reeces")
+        #expect(g.apply("reece, Reece, REECE, reeces") == "priya, Priya, PRIYA, reeces")
     }
 
     @Test func appliesToTranscript() {

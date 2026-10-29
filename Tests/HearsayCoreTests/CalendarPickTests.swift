@@ -22,9 +22,9 @@ final class CalendarPickTests: XCTestCase {
 
     func testGuestListWithoutMeCountsOnlyWhereIAmOnOtherGuestListsWithin6h() {
         // Own calendar: the event lists only the other person, but I'm a guest elsewhere on it today.
-        let oneOnOne = ev("1:1 Will", cal: "mine", guests: ["Will"])
+        let oneOnOne = ev("1:1 Rob", cal: "mine", guests: ["Rob"])
         let standup = ev("standup", cal: "mine", from: -180, to: -165, guests: ["Me", "Ann"], me: true, response: .accepted)
-        XCTAssertEqual(CalendarPick.current(at: now, in: [oneOnOne, standup])?.id, "1:1 Will")
+        XCTAssertEqual(CalendarPick.current(at: now, in: [oneOnOne, standup])?.id, "1:1 Rob")
 
         // Shared interview calendar: I'm on no guest list there.
         let interview = ev("interview", cal: "shared", guests: ["Candidate", "Bob"])

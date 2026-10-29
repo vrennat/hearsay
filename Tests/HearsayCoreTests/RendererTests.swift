@@ -18,7 +18,7 @@ import Testing
     static let tail = """
     attendees:
       - "Tanner Vass"
-      - "Reese"
+      - "Priya"
     speakers:
       - id: mic-1
         name: "Tanner"

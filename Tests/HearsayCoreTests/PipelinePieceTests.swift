@@ -143,8 +143,8 @@ final class TitlerTests: XCTestCase {
         XCTAssertEqual(Titler.title(for: m, timeZone: utc), "2026-10-22 16:05 Meeting")
         m.title = "New meeting"
         XCTAssertEqual(Titler.title(for: m, timeZone: utc), "2026-10-22 16:05 Meeting")
-        m.title = "Will / Tanner"
-        XCTAssertEqual(Titler.title(for: m, timeZone: utc), "Will / Tanner")
+        m.title = "Rob / Tanner"
+        XCTAssertEqual(Titler.title(for: m, timeZone: utc), "Rob / Tanner")
     }
 }
 

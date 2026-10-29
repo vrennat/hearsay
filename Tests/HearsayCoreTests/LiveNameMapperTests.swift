@@ -30,10 +30,10 @@ final class LiveNameMapperTests: XCTestCase {
 
     func testOneToOne() {
         let live = [M.LiveVoice(id: "mic-1", stream: .mic, name: "Tanner", spans: [span(0, 10)]),
-                    M.LiveVoice(id: "sys-1", stream: .system, name: "Reese", spans: [span(10, 20)])]
+                    M.LiveVoice(id: "sys-1", stream: .system, name: "Priya", spans: [span(10, 20)])]
         let final = [M.FinalVoice(id: "mic-2", stream: .mic, spans: [span(0, 9)]),
                      M.FinalVoice(id: "sys-1", stream: .system, spans: [span(10, 20)])]
-        XCTAssertEqual(M.map(live: live, final: final), ["mic-2": "Tanner", "sys-1": "Reese"])
+        XCTAssertEqual(M.map(live: live, final: final), ["mic-2": "Tanner", "sys-1": "Priya"])
     }
 
     func testTwoLiveVoicesToOneFinalSpeakerOnlyBestGetsName() {

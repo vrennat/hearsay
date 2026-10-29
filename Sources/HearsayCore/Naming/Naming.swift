@@ -37,7 +37,7 @@ public enum Naming {
     public static func name(_ input: Input) -> Output {
         let ids = Set(input.speakers.map(\.id))
         var names = input.existing.filter { !$0.value.trimmingCharacters(in: .whitespaces).isEmpty }
-        // A guess is compared by first name ("Alex Kim" from the invite and "Alex" from a known voice
+        // A guess is compared by first name ("Jordan Kim" from the invite and "Jordan" from a known voice
         // are one person); typed and live names only by the whole name, since two real Alexes happen.
         func used(_ n: String, byFirstName: Bool) -> Bool {
             names.values.contains { byFirstName ? firstName($0).lowercased() == firstName(n).lowercased()
@@ -99,7 +99,7 @@ public enum Naming {
         return s.split(separator: " ").first.map(String.init) ?? ""
     }
 
-    /// First name, or a title word of 3+ letters that starts it ("Will / Tanner" names William "Will").
+    /// First name, or a title word of 3+ letters that starts it ("Rob / Tanner" names Robert "Rob").
     public static func displayName(_ attendee: String, title: String) -> String {
         let first = firstName(attendee)
         let words = title.split { !$0.isLetter }.map(String.init)

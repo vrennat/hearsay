@@ -9,8 +9,8 @@
     { "kind": "mic", "file": "audio/mic.m4a", "startOffset": 0, "sampleRate": 48000, "channels": 1, "codec": "aac" },
     { "kind": "system", "file": "audio/system.m4a", "startOffset": 1.5 }
   ],
-  "speakerNames": { "mic-1": "Tanner", "sys-1": "Reese" },
-  "attendees": ["Tanner Vass", "Reese Example"],
+  "speakerNames": { "mic-1": "Tanner", "sys-1": "Priya" },
+  "attendees": ["Tanner Vass", "Priya Example"],
   "me": "Tanner Vass",
   "legacyWindowFrame": "{{0, 0}, {800, 600}}",
   "futureField": { "nested": true }

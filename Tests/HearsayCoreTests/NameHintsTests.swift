@@ -2,7 +2,7 @@ import XCTest
 @testable import HearsayCore
 
 final class NameHintsTests: XCTestCase {
-    let names: Set<String> = ["Nate", "Reese", "Tyler"]
+    let names: Set<String> = ["Nate", "Priya", "Omar"]
 
     func u(_ speaker: String, _ start: Double, _ end: Double, _ text: String) -> Utterance {
         Utterance(speaker: speaker, stream: speaker.hasPrefix("sys") ? .system : .mic, start: start, end: end, text: text)
@@ -20,11 +20,11 @@ final class NameHintsTests: XCTestCase {
     }
 
     func testVocativeEndingQuestion() {
-        XCTAssertEqual(hint([u("mic-1", 0, 2, "Okay. So what's next up, Reese?"), u("sys-2", 2.5, 5, "The launch.")]), ["sys-2": "Reese"])
+        XCTAssertEqual(hint([u("mic-1", 0, 2, "Okay. So what's next up, Priya?"), u("sys-2", 2.5, 5, "The launch.")]), ["sys-2": "Priya"])
     }
 
     func testThanksPointsAtVoiceBefore() {
-        XCTAssertEqual(hint([u("sys-1", 0, 4, "That's the update."), u("mic-1", 5, 6, "Thanks, Tyler.")]), ["sys-1": "Tyler"])
+        XCTAssertEqual(hint([u("sys-1", 0, 4, "That's the update."), u("mic-1", 5, 6, "Thanks, Omar.")]), ["sys-1": "Omar"])
     }
 
     func testRetoldSpeechExcluded() {
@@ -48,7 +48,7 @@ final class NameHintsTests: XCTestCase {
 
     func testNextVoiceAmongNextThreeTurns() {
         // Same-speaker utterances merge into one turn, so the next other voice is found.
-        XCTAssertEqual(hint([u("mic-1", 0, 2, "Hi Reese."), u("mic-1", 2.2, 3, "Can you hear me?"), u("sys-1", 4, 5, "Yes.")]), ["sys-1": "Reese"])
+        XCTAssertEqual(hint([u("mic-1", 0, 2, "Hi Priya."), u("mic-1", 2.2, 3, "Can you hear me?"), u("sys-1", 4, 5, "Yes.")]), ["sys-1": "Priya"])
     }
 
     func testUncapitalizedOrUnknownNamesIgnored() {
@@ -59,16 +59,16 @@ final class NameHintsTests: XCTestCase {
     func testMostVotesThenFirstHeard() {
         let us = [
             u("mic-1", 0, 1, "Hey Nate."), u("sys-1", 1.5, 3, "Hi."),
-            u("mic-1", 4, 5, "Hi Reese."), u("sys-1", 5.5, 7, "Hello."),
-            u("mic-1", 8, 9, "Morning Reese."), u("sys-1", 9.5, 11, "Hey."),
+            u("mic-1", 4, 5, "Hi Priya."), u("sys-1", 5.5, 7, "Hello."),
+            u("mic-1", 8, 9, "Morning Priya."), u("sys-1", 9.5, 11, "Hey."),
         ]
-        XCTAssertEqual(hint(us), ["sys-1": "Reese"])
+        XCTAssertEqual(hint(us), ["sys-1": "Priya"])
         XCTAssertEqual(hint(Array(us.prefix(4))), ["sys-1": "Nate"])  // tie: first heard
     }
 
     func testCandidatesAreCapitalizedFirstNames() {
-        XCTAssertEqual(NameHints.candidates(attendees: ["Tanner Vass", "reese@x.com"], typedNames: ["Nate", "william smith"]),
-                       ["Tanner", "Nate", "William"])
+        XCTAssertEqual(NameHints.candidates(attendees: ["Tanner Vass", "priya@x.com"], typedNames: ["Nate", "robert smith"]),
+                       ["Tanner", "Nate", "Robert"])
     }
 }
 

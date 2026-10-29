@@ -44,7 +44,7 @@ public enum TitleRules {
 
     /// True when the title is empty, a placeholder, a date-time placeholder, or generic: once modifier
     /// words and people's names are dropped, nothing is left or only a generic word ("Sync",
-    /// "Weekly 1:1", "Will / Tanner", "Catch up with Reese").
+    /// "Weekly 1:1", "Rob / Tanner", "Catch up with Priya").
     public static func isGeneric(_ title: String, names: [String] = []) -> Bool {
         if Titler.isPlaceholder(title) || isDatePlaceholder(title) { return true }
         let n = normalize(title)

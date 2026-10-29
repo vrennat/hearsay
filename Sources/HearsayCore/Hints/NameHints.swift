@@ -3,9 +3,9 @@ import Foundation
 /// Name hints from how people address each other (spec, Naming aids). Suggestions only; nothing here
 /// writes a name.
 ///
-/// - "Hey Nate, how's it going?" or "what's next up, Reese?" points at the next voice: the first other
+/// - "Hey Nate, how's it going?" or "what's next up, Priya?" points at the next voice: the first other
 ///   speaker among the next 3 turns that starts within 4 s of the cue turn's end.
-/// - "Thanks, Tyler." points at the voice before: the nearest other speaker among the previous 3 turns
+/// - "Thanks, Omar." points at the voice before: the nearest other speaker among the previous 3 turns
 ///   that ended within 4 s of the cue turn's start.
 /// - A cue counts only right after a greeting or thanks that starts its sentence, or set off by a comma
 ///   and ending a question or the turn; never with retold-speech words in the 4 words before it.

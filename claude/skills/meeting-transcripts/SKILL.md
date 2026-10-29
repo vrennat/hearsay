@@ -18,7 +18,7 @@ one; `~/Meetings/CLAUDE.md` is the folder's own reading guide). One folder per m
   (each `id`, `label`, `main`, `name`, `talkSeconds`), `startedAt`, `status`, `title`. Dates are ISO 8601.
   Use it to filter by date, title or attendee name without opening every folder.
 
-Match "yesterday's standup" or "my call with Will" against `title`, `startedAt` and speaker names.
+Match "yesterday's standup" or "my call with Rob" against `title`, `startedAt` and speaker names.
 
 ### Encrypted folders
 
@@ -36,7 +36,7 @@ In `~/Meetings/<id>/`:
 
   ```
   ---
-  title: "Will / Tanner"
+  title: "Rob / Tanner"
   started: 2026-10-23T09:30:00.000Z
   ended: 2026-10-23T10:02:11.000Z
   duration: "32:11"
@@ -45,7 +45,7 @@ In `~/Meetings/<id>/`:
   named: false
   cleaned_by: "hearsay"
   attendees:
-    - "Will Smith"
+    - "Rob Smith"
   speakers:
     - id: mic-1
       name: "Tanner"
@@ -91,7 +91,7 @@ render. Use the CLI (installed as `hearsay`). Every command takes `--root <folde
 pass it when the user's folder is elsewhere. Quote ids: they contain spaces.
 
 - `hearsay speakers "<id>"`: speakers with ids, labels, names and talk time. Run before renaming.
-- `hearsay rename "<id>" <speaker-id> "<Name>"`: name a speaker, e.g. `sys-1 "Will"`. Empty name `""` clears it.
+- `hearsay rename "<id>" <speaker-id> "<Name>"`: name a speaker, e.g. `sys-1 "Rob"`. Empty name `""` clears it.
   Re-renders the transcript and index.
 - `hearsay title "<id>" "<New title>"`: retitle. The folder name (id) stays.
 - `hearsay hints "<id>"`: name suggestions from how people address each other. Suggestions only; confirm with the
