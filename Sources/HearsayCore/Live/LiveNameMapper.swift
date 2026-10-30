@@ -37,7 +37,7 @@ public enum LiveNameMapper {
         var candidates: [Candidate] = []
         for (li, l) in live.enumerated() {
             let total = l.spans.reduce(0) { $0 + max(0, $1.end - $1.start) }
-            guard total > 0, !l.name.trimmingCharacters(in: .whitespaces).isEmpty else { continue }
+            guard total > 0, !LiveLineBuilder.isUncertain(l.id), !l.name.trimmingCharacters(in: .whitespaces).isEmpty else { continue }
             for (fi, f) in final.enumerated() where f.stream == l.stream {
                 let c = overlap(l.spans, f.spans) / total
                 if c > minimumCoverage { candidates.append(Candidate(live: li, final: fi, coverage: c)) }
@@ -57,7 +57,7 @@ public enum LiveNameMapper {
     /// Convenience over the on-disk models: live speakers with names in `live.speakerNames`.
     public static func map(live: LiveTranscript, transcript: Transcript) -> [String: String] {
         var liveSpans: [String: (StreamKind, [Span])] = [:]
-        for line in live.lines where live.speakerNames[line.speaker] != nil {
+        for line in live.lines where live.speakerNames[line.speaker] != nil && !LiveLineBuilder.isUncertain(line.speaker) {
             liveSpans[line.speaker, default: (line.stream, [])].1.append(Span(line.start, line.end))
         }
         let liveVoices = liveSpans.keys.sorted().map { id in

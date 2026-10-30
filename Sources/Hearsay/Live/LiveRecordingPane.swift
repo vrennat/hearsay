@@ -50,8 +50,13 @@ struct LiveRecordingPane: View {
                             .foregroundStyle(.secondary).frame(width: 16)
                             .accessibilityLabel(s.stream == .mic ? "In the room" : "On the call")
                         VStack(alignment: .leading, spacing: 2) {
-                            SpeakerNameField(model: model, id: s.id, focus: $focused)
-                            if model.names[s.id] == nil, let h = model.hints[s.id] {
+                            if LiveLineBuilder.isUncertain(s.id) {
+                                Text(model.label(s.id)).foregroundStyle(.secondary)
+                                Text("May contain several voices. Naming cannot separate them.").font(.caption).foregroundStyle(.secondary)
+                            } else {
+                                SpeakerNameField(model: model, id: s.id, focus: $focused)
+                            }
+                            if !LiveLineBuilder.isUncertain(s.id), model.names[s.id] == nil, let h = model.hints[s.id] {
                                 Button("Sounds like \(h.name)") { model.rename(s.id, to: h.name) }
                                     .buttonStyle(.plain).font(.caption).foregroundStyle(.secondary)
                                     .help("“\(h.quote)”. Click to use this name.")
@@ -81,8 +86,9 @@ struct LiveRecordingPane: View {
                                     .foregroundStyle(line.stream == .mic ? Color.accentColor : Color.purple)
                             }
                             .buttonStyle(.plain)
-                            .accessibilityHint("Name this speaker")
-                            .help("Click to name this speaker")
+                            .disabled(LiveLineBuilder.isUncertain(line.speaker))
+                            .accessibilityHint(LiveLineBuilder.isUncertain(line.speaker) ? "Speaker separation is uncertain" : "Name this provisional speaker")
+                            .help("Names apply to this detected voice group; naming does not improve speaker separation.")
                             Text(line.text).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .id(i)
@@ -136,7 +142,7 @@ struct SpeakerNameField: View {
             .onAppear { text = model.names[id] ?? "" }
             .onDisappear(perform: save)  // closing the window mid-edit keeps what was typed
             .accessibilityLabel("Name for \(LiveModel.defaultLabel(id))")
-            .help("Type a name, then press Return")
+            .help("Names apply to this provisional voice group. Naming does not improve separation. Press Return to save.")
     }
 
     private func save() {

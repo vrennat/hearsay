@@ -57,7 +57,7 @@ final class LiveModel {
 
     func rename(_ id: String, to name: String) {
         // After Stop the live engines belong to the finished (then the next) meeting.
-        guard isRecording else { return }
+        guard isRecording, !LiveLineBuilder.isUncertain(id) else { return }
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         names[id] = trimmed.isEmpty ? nil : trimmed
         drafts[id] = nil
@@ -79,6 +79,6 @@ final class LiveModel {
 
     /// Room N for mic voices, Remote N for call voices (spec default labels; `Me` is only decided after the call).
     static func defaultLabel(_ id: String) -> String {
-        (id.hasPrefix("sys") ? "Remote " : "Room ") + String(slot(id))
+        LiveLineBuilder.isUncertain(id) ? (id.hasPrefix("sys") ? "Remote — speaker uncertain" : "Room — speaker uncertain") : (id.hasPrefix("sys") ? "Remote " : "Room ") + String(slot(id))
     }
 }

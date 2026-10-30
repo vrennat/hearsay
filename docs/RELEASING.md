@@ -82,3 +82,18 @@ manager and delete it). **Losing it means no installed copy can be updated again
 to reinstall by hand. `release.sh` refuses to run without `Resources/sparkle-public-key.txt`. The cask
 says `auto_updates true`, so `brew upgrade` leaves updating to the app.
 
+
+## Live speaker assignment (0.1.7)
+
+Unmatched live words and equal-overlap ambiguities are shown as Speaker uncertain, never Remote 1.
+Nearby speech without temporal overlap is no longer used as evidence of a speaker. Uncertain groups
+cannot be named or supply names to the final transcript. Detected groups remain provisional; naming
+one does not train the diarizer or split merged voices. Final offline diarization remains independent.
+Content-free `live-assignment` log counters every 30 seconds report words, matched/uncertain words,
+segment slots, matched slots and segment count. Many uncertain words point to timing/coverage;
+one matched slot with one segment slot points toward model merging, not a participant count.
+Synthetic four-voice/timing fixtures validate assignment, not acoustic model accuracy.
+
+`release.sh` builds with `--no-install`: publishing never replaces or quits the installed app.
+Set `HEARSAY_BUILD_ROOT` to an isolated scratch/staging directory and `HEARSAY_BUILD_JOBS=1`
+for a bounded build. Large external writers must run under the host's required-volume supervisor.

@@ -76,13 +76,14 @@ BUILD="${HEARSAY_BUILD_NUMBER:-$(git rev-list --count HEAD 2>/dev/null || echo 1
 # --- Build -------------------------------------------------------------------------------------
 # The App Store build compiles the updater out and drops the unused Sparkle load command; the store
 # updates it, and a self-updater would be rejected.
-SWIFT_FLAGS=()
-if (( MAS )); then SWIFT_FLAGS=(-Xswiftc -DHEARSAY_NO_SPARKLE -Xlinker -dead_strip_dylibs); fi
+BUILD_ROOT="${HEARSAY_BUILD_ROOT:-$ROOT/.build}"
+SWIFT_FLAGS=(--scratch-path "$BUILD_ROOT" --jobs "${HEARSAY_BUILD_JOBS:-2}")
+if (( MAS )); then SWIFT_FLAGS+=(-Xswiftc -DHEARSAY_NO_SPARKLE -Xlinker -dead_strip_dylibs); fi
 swift build -c release --product Hearsay ${SWIFT_FLAGS[@]+"${SWIFT_FLAGS[@]}"}
 swift build -c release --product hearsay-cli ${SWIFT_FLAGS[@]+"${SWIFT_FLAGS[@]}"}
 BIN="$(swift build -c release --show-bin-path ${SWIFT_FLAGS[@]+"${SWIFT_FLAGS[@]}"})"
 
-STAGE="$ROOT/.build/app"
+STAGE="$BUILD_ROOT/app"
 APP="$STAGE/Hearsay.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"

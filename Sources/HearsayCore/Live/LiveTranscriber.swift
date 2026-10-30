@@ -47,6 +47,7 @@ public actor LiveTranscriber {
     private var meetingID: String?
     private var store: MeetingStore?
     private var speakerNames: [String: String] = [:]
+    private var lastDiagnostic: Date?
     private var lastSave: Date?
     private var dirty = false
     private var onLines: (@Sendable ([LiveLine]) -> Void)?
@@ -80,7 +81,7 @@ public actor LiveTranscriber {
         }
         self.meetingID = meetingID; self.store = store; self.onLines = onLines
         streams = [:]; echo = LiveEchoTracker(); speakerNames = [:]
-        lastSave = nil; dirty = false
+        lastDiagnostic = nil; lastSave = nil; dirty = false
     }
 
     /// Loads both streams' engines now instead of on the first buffer.
@@ -149,6 +150,7 @@ public actor LiveTranscriber {
 
     /// Names a live speaker (nil or empty clears it) and saves immediately.
     public func renameSpeaker(_ id: String, to name: String?) throws {
+        guard !LiveLineBuilder.isUncertain(id) else { return }
         let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         speakerNames[id] = trimmed.isEmpty ? nil : trimmed
         dirty = true
@@ -180,6 +182,13 @@ public actor LiveTranscriber {
     private func save() throws {
         guard dirty else { return }
         let live = snapshot()
+        if lastDiagnostic == nil || now().timeIntervalSince(lastDiagnostic!) >= 30 {
+            let kept = echoFiltered()
+            for (kind, state) in streams {
+                HSLog("live-assignment").info("stream=\(kind.rawValue) " + LiveLineBuilder.diagnostics(words: kept[kind] ?? [], segments: state.segments))
+            }
+            lastDiagnostic = now()
+        }
         onLines?(live.lines)
         if let store, let meetingID { try store.saveLive(live, id: meetingID) }
         lastSave = now(); dirty = false

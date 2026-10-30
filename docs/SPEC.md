@@ -168,3 +168,7 @@ No cloud, no accounts, no sync, no iOS companion, no editing the transcript text
 
 After each step, run `swift test`, build the app, and do one real recording before moving on.
 - 2026-10-24: **Platform floor lowered to macOS 26** (Tanner, before the App Store submission: "is it possible to bump required version down to macos 26?"). A clean build with `.macOS(.v26)` compiles with no availability errors: Foundation Models, the Core Audio process tap, Icon Composer icons and Liquid Glass all shipped in 26. `Package.swift`, `LSMinimumSystemVersion`, the icon compile target and the cask (`>= :tahoe`) now say 26. Apple Silicon only is unchanged. Not verified at runtime on a macOS 26 machine (both development Macs run 27); the expected risk is cosmetic..
+
+## 2026-10-30: honest live speaker assignment
+
+Live words require overlapping diarizer evidence; unmatched or equal-overlap words use a distinct unknown id. Unknown groups cannot be named or transfer names to final speakers. Existing numbered ids and old live files retain their meaning. Naming a detected group remains provisional and never trains or splits voices. Final offline diarization is unchanged. Content-free assignment counters distinguish missing coverage from single-slot model output; attendee counts never force voice counts.

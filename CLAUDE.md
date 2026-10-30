@@ -293,3 +293,7 @@
 - **People on the call removed**; `Attribution.build` lost `foldTiny`. Reprocessing logs "reprocessing changed the call voices N -> M; names typed for old ids may now be on other voices" when the number of call voices changes and a call voice had a name (the tuning often turns one old Remote into several, and a name typed on the old `sys-1` then sits on the new `sys-1` only). If every call slot is under 5% (20+ even fragments, not seen on real calls), the fold keeps the largest slots that hold 80% of the words instead of skipping.
 - **Checked without listening** (Tanner had no time to listen): on the 2-person call the two call voices' CAM++ cosine is 0.59 (nearer the different-person band), and the transcript agrees, each person answering when addressed by name on a different call voice. On the ~7-person call the two voices score 0.95 (the shared-room pattern), so that split is not shown to follow people. No meeting content goes into this public repo: describe calls by size and date only.
 
+
+## 2026-10-30: live assignment 0.1.7
+
+Removed zero-slot and nearby-turn fallback, which falsely assigned unknown words to a detected voice. Equal overlapping slots are uncertain too. Unknown ids remain string ids for JSON compatibility and are excluded from naming and final name transfer. Synthetic delayed four-voice fixtures validate assignment, not model accuracy. Release staging supports an external scratch directory and never installs or restarts the active app.

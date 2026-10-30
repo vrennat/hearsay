@@ -50,13 +50,14 @@ gh auth status >/dev/null 2>&1 || die "gh is not logged in (run: gh auth login)"
 
 # --- Build -----------------------------------------------------------------------------------------
 step "Building with scripts/build-app.sh"
-scripts/build-app.sh
-APP="$ROOT/.build/app/Hearsay.app"   # build-app.sh stages the signed bundle here before installing it
+scripts/build-app.sh --no-install
+BUILD_ROOT="${HEARSAY_BUILD_ROOT:-$ROOT/.build}"
+APP="$BUILD_ROOT/app/Hearsay.app"   # build-app.sh stages the signed bundle here before installing it
 [[ -d "$APP" ]] || die "no staged bundle at $APP"
 [[ -x "$APP/Contents/MacOS/hearsay-cli" ]] || die "$APP has no Contents/MacOS/hearsay-cli; the cask links it"
 codesign --verify --strict --verbose=2 "$APP"
 
-OUT="$ROOT/.build/release"
+OUT="$BUILD_ROOT/release"
 ZIP="$OUT/Hearsay-$WANT.zip"
 mkdir -p "$OUT"
 rm -f "$ZIP"
@@ -85,7 +86,7 @@ echo "sha256 $SHA"
 # One item, the release being published: Sparkle offers the newest build to everyone older. The EdDSA
 # signature uses the private key in this Mac's login Keychain (Sparkle's generate_keys).
 step "Signing the update and writing appcast.xml"
-SPARKLE_BIN="$ROOT/.build/artifacts/sparkle/Sparkle/bin"
+SPARKLE_BIN="$BUILD_ROOT/artifacts/sparkle/Sparkle/bin"
 [[ -x "$SPARKLE_BIN/sign_update" ]] || die "no $SPARKLE_BIN/sign_update; run swift package resolve"
 SIG="$("$SPARKLE_BIN/sign_update" "$ZIP")" || die "sign_update failed (is the Sparkle private key in the Keychain?)"
 [[ "$SIG" == *edSignature=* ]] || die "sign_update printed no signature: $SIG"

@@ -7,7 +7,7 @@ public enum LiveRenderer {
         for l in live.lines {
             let text = l.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !text.isEmpty else { continue }
-            out += "[\(Format.clock(l.start))] **\(live.speakerNames[l.speaker] ?? l.speaker):** \(text)\n\n"
+            out += "[\(Format.clock(l.start))] **\(LiveLineBuilder.isUncertain(l.speaker) ? "Speaker uncertain" : (live.speakerNames[l.speaker] ?? l.speaker)):** \(text)\n\n"
         }
         return out
     }

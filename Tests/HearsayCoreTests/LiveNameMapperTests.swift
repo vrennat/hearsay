@@ -57,6 +57,12 @@ final class LiveNameMapperTests: XCTestCase {
         XCTAssertEqual(M.map(live: live, final: final), [:])
     }
 
+    func testUncertainGroupCannotSupplyAFinalName() {
+        let live = [M.LiveVoice(id: "sys-unknown", stream: .system, name: "Wrong group name", spans: [span(0, 10)])]
+        let final = [M.FinalVoice(id: "sys-1", stream: .system, spans: [span(0, 10)])]
+        XCTAssertEqual(M.map(live: live, final: final), [:])
+    }
+
     func testFromOnDiskModels() {
         let live = LiveTranscript(updatedAt: Date(), speakerNames: ["mic-1": "Tanner"], lines: [
             LiveLine(speaker: "mic-1", stream: .mic, start: 0, end: 4, text: "hi"),

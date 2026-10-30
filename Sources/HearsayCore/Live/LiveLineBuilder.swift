@@ -17,20 +17,35 @@ public enum LiveLineBuilder {
         "\(stream == .mic ? "mic" : "sys")-\(slot + 1)"
     }
 
-    /// The slot whose segments overlap the word most; with no overlap, the nearest segment within 1 s;
-    /// else slot 0.
-    static func slot(for w: Word, in segments: [Segment]) -> Int {
-        var best: (slot: Int, overlap: Double)?
-        var nearest: (slot: Int, gap: Double)?
-        for s in segments {
-            let o = min(w.end, s.end) - max(w.start, s.start)
-            if o > 0, o > (best?.overlap ?? 0) { best = (s.slot, o) }
-            let gap = max(s.start - w.end, w.start - s.end, 0)
-            if gap < (nearest?.gap ?? .infinity) { nearest = (s.slot, gap) }
+    /// Unknown is deliberately distinct from the first detected voice. Stable ids keep old live files readable.
+    public static func uncertainID(_ stream: StreamKind) -> String {
+        stream == .system ? "sys-unknown" : "mic-unknown"
+    }
+
+    public static func isUncertain(_ id: String) -> Bool {
+        id == "sys-unknown" || id == "mic-unknown"
+    }
+
+    /// Require temporal evidence. A nearby turn is not evidence that this word belongs to its speaker.
+    /// Equal overlap from different voices is ambiguous (often overlapping speech).
+    static func slot(for w: Word, in segments: [Segment]) -> Int? {
+        var overlaps: [Int: Double] = [:]
+        for s in segments where s.slot >= 0 {
+            let overlap = min(w.end, s.end) - max(w.start, s.start)
+            if overlap > 0 { overlaps[s.slot] = max(overlaps[s.slot] ?? 0, overlap) }
         }
-        if let best { return best.slot }
-        if let nearest, nearest.gap <= 1 { return nearest.slot }
-        return 0
+        let ranked = overlaps.sorted { $0.value > $1.value }
+        guard let best = ranked.first else { return nil }
+        if ranked.count > 1, abs(best.value - ranked[1].value) < 0.000001 { return nil }
+        return best.key
+    }
+
+    /// Content-free assignment counters. Segment slots and matched word slots distinguish model
+    /// merging from absent/misaligned segments; no text, names, meeting ids or paths are included.
+    public static func diagnostics(words: [Word], segments: [Segment]) -> String {
+        let words = words.filter { !$0.text.trimmingCharacters(in: .whitespaces).isEmpty }
+        let assigned = words.compactMap { slot(for: $0, in: segments) }
+        return "words=\(words.count) matched=\(assigned.count) uncertain=\(words.count - assigned.count) segmentSlots=\(Set(segments.map(\.slot)).count) matchedSlots=\(Set(assigned).count) segments=\(segments.count)"
     }
 
     /// Appends streaming tokens to `words`. A token without a word-boundary prefix (`▁` or a space)
@@ -60,7 +75,7 @@ public enum LiveLineBuilder {
         for w in words.sorted(by: { $0.start < $1.start }) {
             let text = w.text.trimmingCharacters(in: .whitespaces)
             guard !text.isEmpty else { continue }
-            let id = speakerID(stream, slot: slot(for: w, in: segments))
+            let id = slot(for: w, in: segments).map { speakerID(stream, slot: $0) } ?? uncertainID(stream)
             if var line = out.last, line.speaker == id, w.start - lastEnd < pauseSeconds, w.end - line.start <= maxLineSeconds {
                 line.text += " " + text
                 line.end = max(line.end, w.end)
