@@ -40,16 +40,3 @@ enum Prefs {
         return n.isEmpty ? nil : n
     }
 }
-
-/// Which build this is: the Info.plist key `HSDistribution` written by `scripts/build-app.sh`
-/// (`appStore` with `--mas`, else `developerID`). A bare `swift run` binary reads as Developer ID.
-enum Distribution: String {
-    case developerID, appStore
-
-    static let current: Distribution =
-        (Bundle.main.object(forInfoDictionaryKey: "HSDistribution") as? String).flatMap(Distribution.init) ?? .developerID
-
-    /// The clamshell override is a private IOPMrootDomain call; the store build keeps only the
-    /// idle-sleep assertion.
-    var allowsClamshellOverride: Bool { self == .developerID }
-}

@@ -24,9 +24,7 @@ final class SleepGuard {
             holding = st == kIOReturnSuccess
             log.info("Idle-sleep assertion \(holding ? "held" : "failed (\(st))")")
         }
-        if !Distribution.current.allowsClamshellOverride {
-            log.info("App Store build: idle-sleep assertion only, no clamshell override")
-        } else if Self.clamshellCausesSleep() == true {
+        if Self.clamshellCausesSleep() == true {
             if Self.setClamshellSleep(enabled: false) {
                 defaults.set(true, forKey: Self.disabledClamshellKey)
                 log.info("Clamshell sleep disabled")

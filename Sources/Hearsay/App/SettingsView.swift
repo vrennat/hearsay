@@ -172,15 +172,13 @@ struct RecordingPane: View {
             }
             Section {
                 LabeledContent("While recording") {
-                    Text(Distribution.current == .appStore ? "Keeps the Mac awake" : "Keeps the Mac awake, lid closed too")
+                    Text("Keeps the Mac awake, lid closed too")
                         .foregroundStyle(.secondary)
                 }
             } header: {
                 Text("Sleep")
             } footer: {
-                FormFooter(Distribution.current == .appStore
-                    ? "The Mac can still sleep when the lid closes."
-                    : "Lid-close sleep is restored when recording stops.")
+                FormFooter("Lid-close sleep is restored when recording stops.")
             }
         }
         .settingsPane()
@@ -241,9 +239,8 @@ struct StoragePane: View {
 }
 
 /// Two things an agent needs: the `hearsay` command and the Meetings folder. When the command is
-/// installed the row says only that; the install action appears only when it is not. The Developer ID
-/// build creates the `~/.local/bin/hearsay` symlink itself; the App Store sandbox cannot write there,
-/// so it shows the command to paste into Terminal.
+/// installed the row says only that; the install action appears only when it is not, and creates the
+/// `~/.local/bin/hearsay` symlink.
 struct AgentsPane: View {
     @State private var state = CLIInstall.state()
     @State private var copied: String?
@@ -256,7 +253,7 @@ struct AgentsPane: View {
                 LabeledContent {
                     HStack {
                         Text(state.title).foregroundStyle(.secondary)
-                        if state != .installed, Distribution.current != .appStore {
+                        if state != .installed {
                             Button(state == .other ? "Replace" : "Install") {
                                 do { try CLIInstall.install(); error = nil } catch { self.error = "Could not install: \(error.localizedDescription)" }
                                 state = CLIInstall.state()
@@ -268,14 +265,6 @@ struct AgentsPane: View {
                     Text("hearsay command")
                     Text(state == .installed ? "Run hearsay --help in Terminal" : "Puts hearsay on your PATH")
                         .font(.caption).foregroundStyle(.secondary)
-                }
-                if state != .installed, Distribution.current == .appStore {
-                    HStack(alignment: .top) {
-                        Text(CLIInstall.linkCommand).font(.caption.monospaced()).textSelection(.enabled)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Spacer()
-                        copyButton("Copy", CLIInstall.linkCommand, help: "Copy the command to paste into Terminal")
-                    }
                 }
                 if let error {
                     Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
@@ -325,7 +314,6 @@ enum CLIInstall {
     }
 
     static var cliPath: String { Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS/hearsay-cli").path }
-    static var linkCommand: String { "mkdir -p ~/.local/bin && ln -sf '\(cliPath)' ~/.local/bin/hearsay" }
     static var link: URL { FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/bin/hearsay") }
 
     /// A symlink to this bundle's CLI, or a regular file (`build-app.sh` copies one), counts as installed.

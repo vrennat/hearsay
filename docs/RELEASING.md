@@ -67,8 +67,7 @@ removes the log, the preferences and the FluidAudio models. `~/Meetings` is neve
 The Developer ID build updates itself with Sparkle 2. The feed is
 `https://github.com/vrennat/hearsay/releases/latest/download/appcast.xml`; `scripts/release.sh` writes
 `appcast.xml` (one item: the release being published), signs the zip with `sign_update`, and attaches
-both files to the GitHub release. The App Store build compiles the updater out (`HEARSAY_NO_SPARKLE`) and
-ships without the framework.
+both files to the GitHub release.
 
 One-time setup on the release Mac (the private key never leaves its login Keychain):
 

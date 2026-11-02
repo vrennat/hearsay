@@ -14,7 +14,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/FluidInference/FluidAudio", exact: "0.17.7", traits: []),  // no traits: skips the unused NemoTextProcessing binary
         .package(url: "https://github.com/apple/swift-argument-parser", exact: "1.8.2"),
-        // Self-update for the Developer ID build; the App Store build strips it (scripts/build-app.sh --mas).
+        // Self-update (docs/RELEASING.md).
         .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.0"),
     ],
     targets: [

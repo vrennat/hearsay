@@ -14,7 +14,7 @@ Requires macOS 26 or later on Apple Silicon.
 brew install --cask vrennat/tap/hearsay
 ```
 
-This puts `Hearsay.app` in `/Applications` and a `hearsay` command on your `PATH`. Or download `Hearsay-<version>.zip` from the [releases page](https://github.com/vrennat/hearsay/releases). A Mac App Store build is in progress.
+This puts `Hearsay.app` in `/Applications` and a `hearsay` command on your `PATH`. Or download `Hearsay-<version>.zip` from the [releases page](https://github.com/vrennat/hearsay/releases).
 
 On first launch grant Microphone, System Audio Recording and (for meeting detection) Calendar access. Dictation also needs Accessibility.
 
