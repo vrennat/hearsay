@@ -16,6 +16,9 @@ public final class CAFStreamWriter: @unchecked Sendable {
     private var timeline: StreamTimeline
     private var converter: AVAudioConverter?
     private var level = AudioLevel()
+    /// Frames cut because they ran ahead of their host time, and how many times that happened.
+    private var cutFrames: Int64 = 0
+    private var cuts = 0
     private let log = HSLog("capture")
 
     /// `meetingStartHostTime` is `HostClock.now()` at meeting start.
@@ -48,11 +51,16 @@ public final class CAFStreamWriter: @unchecked Sendable {
         guard let pcm = convert(buffer), pcm.frameLength > 0 else { return AudioLevel.floor }
         let at = HostClock.seconds(from: meetingStartHostTime, to: hostTime)
         let first = timeline.startOffset == nil
-        let pad = timeline.silenceBefore(bufferAt: at, frames: Int(pcm.frameLength))
+        let place = timeline.place(bufferAt: at, frames: Int(pcm.frameLength))
         if first, let offset = timeline.startOffset { saveSidecar(offset: offset) }
+        if place.skip > 0 { noteCut(place.skip, at: at) }
         do {
-            if pad > 0 { try writeSilence(frames: pad, to: file) }
-            try file.write(from: pcm)
+            if place.pad > 0 { try writeSilence(frames: place.pad, to: file) }
+            let keep = Int(pcm.frameLength) - place.skip
+            if keep > 0 {
+                // The timeline counted `keep` frames; silence keeps the file aligned if the copy fails.
+                if let kept = Self.dropping(place.skip, of: pcm) { try file.write(from: kept) } else { try writeSilence(frames: keep, to: file) }
+            }
         } catch {
             log.error("\(kind.rawValue) write failed: \(error)")
         }
@@ -69,6 +77,9 @@ public final class CAFStreamWriter: @unchecked Sendable {
     public func finish() -> AudioStream? {
         lock.lock(); defer { lock.unlock() }
         file = nil
+        if cuts > 0 {
+            log.info("\(kind.rawValue): cut \(String(format: "%.1f", Double(cutFrames) / format.sampleRate)) s that ran ahead of the clock, \(cuts) buffer(s)")
+        }
         try? FileManager.default.removeItem(at: Self.sidecarURL(for: url))
         guard let offset = timeline.startOffset else {
             try? FileManager.default.removeItem(at: url)
@@ -110,6 +121,27 @@ public final class CAFStreamWriter: @unchecked Sendable {
             return buffer
         }
         if let err { log.error("\(kind.rawValue) convert failed: \(err)"); return nil }
+        return out
+    }
+
+    /// First cut logged; later ones every 1,000th, with the total at `finish()`.
+    private func noteCut(_ frames: Int, at seconds: Double) {
+        cutFrames += Int64(frames)
+        cuts += 1
+        if cuts == 1 || cuts % 1000 == 0 {
+            log.error("\(kind.rawValue) audio ran ahead of the clock at \(String(format: "%.1f", seconds)) s; cut \(frames) frames (\(cuts) cut(s) so far)")
+        }
+    }
+
+    /// The buffer without its first `n` frames (the buffer itself when `n` is 0), nil if it cannot be made.
+    static func dropping(_ n: Int, of buf: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
+        guard n > 0 else { return buf }
+        let keep = Int(buf.frameLength) - n
+        guard keep > 0, let src = buf.floatChannelData,
+              let out = AVAudioPCMBuffer(pcmFormat: buf.format, frameCapacity: AVAudioFrameCount(keep)),
+              let dst = out.floatChannelData else { return nil }
+        out.frameLength = AVAudioFrameCount(keep)
+        for c in 0..<Int(buf.format.channelCount) { dst[c].update(from: src[c] + n, count: keep) }
         return out
     }
 

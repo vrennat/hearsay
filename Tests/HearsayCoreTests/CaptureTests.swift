@@ -8,33 +8,71 @@ import Testing
 
     @Test func firstBufferSetsStartOffset() {
         var t = StreamTimeline(sampleRate: 48_000)
-        #expect(t.silenceBefore(bufferAt: 2.25, frames: 480) == 0)
+        #expect(t.place(bufferAt: 2.25, frames: 480) == .init(pad: 0, skip: 0))
         #expect(t.startOffset == 2.25)
         #expect(t.framesWritten == 480)
     }
 
     @Test func bufferBeforeMeetingStartClampsToZero() {
         var t = StreamTimeline(sampleRate: 16_000)
-        _ = t.silenceBefore(bufferAt: -0.01, frames: 160)
+        _ = t.place(bufferAt: -0.01, frames: 160)
         #expect(t.startOffset == 0)
     }
 
     @Test func contiguousBuffersNeedNoSilence() {
         var t = StreamTimeline(sampleRate: 48_000)
-        _ = t.silenceBefore(bufferAt: 1.0, frames: 4800)
+        _ = t.place(bufferAt: 1.0, frames: 4800)
         // 0.1 s later plus 10 ms jitter: within tolerance
-        #expect(t.silenceBefore(bufferAt: 1.11, frames: 4800) == 0)
+        #expect(t.place(bufferAt: 1.11, frames: 4800) == .init(pad: 0, skip: 0))
         #expect(t.framesWritten == 9600)
     }
 
     @Test func gapIsFilledSoFramesStayOnMeetingTime() {
         var t = StreamTimeline(sampleRate: 48_000)
-        _ = t.silenceBefore(bufferAt: 1.0, frames: 4800)  // covers 1.0 ..< 1.1
-        let pad = t.silenceBefore(bufferAt: 3.1, frames: 4800)  // 2 s silent gap
+        _ = t.place(bufferAt: 1.0, frames: 4800)  // covers 1.0 ..< 1.1
+        let pad = t.place(bufferAt: 3.1, frames: 4800).pad  // 2 s silent gap
         #expect(pad == 96_000)
         #expect(t.framesWritten == 4800 + 96_000 + 4800)
         // the frame at meeting time 3.1 sits at file index (3.1 - startOffset) * rate
         #expect(Double(t.framesWritten - 4800) / 48_000 + 1.0 == 3.1)
+    }
+
+    @Test func smallLeadIsKeptAsDrift() {
+        var t = StreamTimeline(sampleRate: 48_000)
+        _ = t.place(bufferAt: 0, frames: 48_000)
+        // 1 s of audio, then the next buffer stamped 0.3 s early: under `aheadTolerance`, kept whole
+        #expect(t.place(bufferAt: 0.7, frames: 4800) == .init(pad: 0, skip: 0))
+    }
+
+    @Test func audioAheadOfTheClockIsCut() {
+        // Two IOProcs writing the same 10 ms of time (a teardown that did not stop the old one):
+        // the file must stay on the clock instead of growing twice as fast.
+        var t = StreamTimeline(sampleRate: 48_000)
+        for i in 0..<1000 {
+            let at = Double(i) * 0.01
+            _ = t.place(bufferAt: at, frames: 480)
+            _ = t.place(bufferAt: at, frames: 480)
+        }
+        #expect(abs(t.durationSeconds - 10) <= t.aheadTolerance + 0.01)
+    }
+
+    @Test func cutWithSmallBuffersBringsTheTrackBackOnTheClock() {
+        // 10 ms tap buffers and a 0.6 s lead: cutting must not stop at the 0.5 s threshold.
+        var t = StreamTimeline(sampleRate: 48_000)
+        _ = t.place(bufferAt: 0, frames: Int(0.6 * 48_000))  // 0.6 s of audio stamped at 0
+        for i in 0..<300 { _ = t.place(bufferAt: Double(i) * 0.01, frames: 480) }  // then 3 s on the clock
+        let lead = t.durationSeconds - 3.0
+        #expect(lead <= t.tolerance + 0.011)
+        #expect(lead >= -0.011)
+    }
+
+    @Test func cutDropsOnlyTheOverlap() {
+        var t = StreamTimeline(sampleRate: 1000)
+        _ = t.place(bufferAt: 0, frames: 2000)  // 2 s of audio covering 0 ..< 2
+        #expect(t.place(bufferAt: 1.0, frames: 1500) == .init(pad: 0, skip: 1000))  // keeps 2.0 ..< 2.5
+        #expect(t.framesWritten == 2500)
+        #expect(t.place(bufferAt: 1.2, frames: 500) == .init(pad: 0, skip: 500))  // wholly behind: dropped
+        #expect(t.framesWritten == 2500)
     }
 
     @Test func hostClockSignedSeconds() {
@@ -66,11 +104,71 @@ import Testing
         #expect(CallAppPolicy.isIgnored(bundleID: "us.zoom.xos", pid: 7, ownPID: 7))  // our own pid
     }
 
+    private static func proc(_ pid: Int32, _ bundle: String?, device: Bool = true) -> CallAppTracker.Proc {
+        .init(pid: pid, bundleID: bundle, hasInputDevice: device)
+    }
+
     @Test func onlyNewNonIgnoredInputUsersPause() {
-        let now: [(pid: Int32, bundleID: String?)] = [
-            (5, "us.zoom.xos"), (6, "com.apple.corespeech"), (7, "com.tannervass.hearsay"), (8, "com.google.Chrome"),
-        ]
-        #expect(CallAppPolicy.newInputUsers(previous: [5], current: now, ownPID: 7) == [8])
+        var t = CallAppTracker(ownPID: 7, alreadyRunning: [Self.proc(5, "us.zoom.xos")])
+        let now = [Self.proc(5, "us.zoom.xos"), Self.proc(6, "com.apple.corespeech"),
+                   Self.proc(7, "com.tannervass.hearsay"), Self.proc(8, "com.google.Chrome")]
+        #expect(t.poll(now, now: 1) == [8])
+        #expect(t.poll(now, now: 2) == [])
+    }
+
+    @Test func knownAppRestartingMicInputDoesNotPause() {
+        // 2026-11-02: Zoom, in the call, stopped and restarted mic input for a screen share with sound.
+        var t = CallAppTracker(ownPID: 1, alreadyRunning: [])
+        let zoom = Self.proc(40, "us.zoom.xos")
+        #expect(t.poll([zoom], now: 0) == [40])  // first time this recording: pause
+        #expect(t.poll([zoom], now: 1) == [])
+        #expect(t.poll([], now: 2) == [])  // input stops ...
+        #expect(t.poll([zoom], now: 3) == [])  // ... and restarts: same pid, no pause
+        #expect(t.poll([], now: 4) == [])
+        #expect(t.poll([Self.proc(41, "US.ZOOM.XOS")], now: 5) == [])  // new pid, same bundle id: no pause
+        #expect(t.knownBundleIDs == ["us.zoom.xos"])
+    }
+
+    @Test func startLongAfterAStopPausesAgain() {
+        // Zoom relaunched or a second call: the original "running tap blocks Zoom" case.
+        var t = CallAppTracker(ownPID: 1, alreadyRunning: [Self.proc(40, "us.zoom.xos")])
+        #expect(t.poll([], now: 0) == [])
+        #expect(t.poll([Self.proc(40, "us.zoom.xos")], now: CallAppPolicy.restartWindow + 1) == [40])
+        #expect(t.poll([], now: 30) == [])
+        #expect(t.poll([Self.proc(77, "us.zoom.xos")], now: 30 + CallAppPolicy.restartWindow + 1) == [77])
+    }
+
+    @Test func appAlreadyInACallAtStartDoesNotPauseOnRestart() {
+        var t = CallAppTracker(ownPID: 1, alreadyRunning: [Self.proc(40, "us.zoom.xos")])
+        #expect(t.poll([], now: 1) == [])
+        #expect(t.poll([Self.proc(40, "us.zoom.xos")], now: 2) == [])
+    }
+
+    @Test func knownAppStuckWithoutInputDevicePausesAfterGrace() {
+        var t = CallAppTracker(ownPID: 1, alreadyRunning: [Self.proc(40, "us.zoom.xos")])
+        _ = t.poll([], now: 0)
+        let stuck = Self.proc(40, "us.zoom.xos", device: false)
+        #expect(t.poll([stuck], now: 1) == [])
+        #expect(t.poll([stuck], now: 1 + CallAppPolicy.blockedGrace - 0.5) == [])
+        #expect(t.poll([stuck], now: 1 + CallAppPolicy.blockedGrace) == [40])
+        #expect(t.poll([stuck], now: 20) == [])  // once
+    }
+
+    @Test func knownAppThatGetsItsDeviceIsLeftAlone() {
+        var t = CallAppTracker(ownPID: 1, alreadyRunning: [Self.proc(40, "us.zoom.xos")])
+        _ = t.poll([], now: 0)
+        #expect(t.poll([Self.proc(40, "us.zoom.xos", device: false)], now: 1) == [])
+        #expect(t.poll([Self.proc(40, "us.zoom.xos")], now: 2) == [])
+        #expect(t.poll([Self.proc(40, "us.zoom.xos", device: false)], now: 20) == [])  // not a new restart
+    }
+
+    @Test func rebuildWaitsForTheOutputToSettle() {
+        #expect(OutputSettle.wait(now: 10, lastChange: nil, waitingSince: 10) == 0)
+        #expect(OutputSettle.wait(now: 10, lastChange: 9.5, waitingSince: 10) == 1.5)
+        #expect(OutputSettle.wait(now: 12, lastChange: 9.5, waitingSince: 10) == 0)
+        // a device that keeps changing is waited on for at most `maxWait`
+        #expect(OutputSettle.wait(now: 24, lastChange: 23.9, waitingSince: 10) == 1)
+        #expect(OutputSettle.wait(now: 25, lastChange: 24.9, waitingSince: 10) == 0)
     }
 
     // MARK: Level
@@ -187,6 +285,26 @@ import Testing
         #expect(!FileManager.default.fileExists(atPath: CAFStreamWriter.sidecarURL(for: url).path))
         let f = try AVAudioFile(forReading: url)
         #expect(abs(Double(f.length) - 1.1 * rate) < 2)  // 0.1 + 0.9 silence + 0.1
+    }
+
+    @Test func writerCutsAudioThatRunsAheadOfTheClock() throws {
+        let root = try TestSupport.tempRoot()
+        let url = root.appendingPathComponent("audio/system.caf")
+        let rate = 48_000.0
+        let start = HostClock.now()
+        let ticksPerSecond = UInt64(1 / HostClock.seconds(1_000_000) * 1_000_000)
+        let w = try CAFStreamWriter(kind: .system, url: url, sampleRate: rate, channels: 2, meetingStartHostTime: start)
+        let b = Self.tone(frames: 4800, rate: rate, channels: 2)
+        // 2 s of host time, each 0.1 s buffer delivered twice
+        for i in 0..<20 {
+            let host = start + UInt64(i) * ticksPerSecond / 10
+            w.append(b, hostTime: host)
+            w.append(b, hostTime: host)
+        }
+        _ = w.finish()
+        let f = try AVAudioFile(forReading: url)
+        #expect(Double(f.length) / rate <= 2.0 + 0.5 + 0.1)  // not 4 s
+        #expect(Double(f.length) / rate >= 2.0)
     }
 
     @Test func writerConvertsALaterDeviceFormat() throws {
